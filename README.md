@@ -1,6 +1,6 @@
-# Igreja Backend — Assembleia de Deus Jardim Cidade Universitária
+# Sistema de Gestão — Assembleia de Deus Jardim Cidade Universitária
 
-Backend do sistema de gestão da igreja, desenvolvido como artefato do TCC (UFPB).
+Sistema de gestão da igreja, desenvolvido como artefato do TCC (UFPB).
 
 **Stack:** Node.js · TypeScript · Express · Prisma ORM · PostgreSQL
 
