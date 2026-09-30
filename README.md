@@ -1,150 +1,95 @@
-# Sistema de Gestão — Assembleia de Deus Jardim Cidade Universitária
+# Igreja Gestão
 
-Sistema de gestão da igreja, desenvolvido como artefato do TCC (UFPB).
+Sistema de gestão para a Assembleia de Deus Jardim Cidade Universitária, desenvolvido como artefato do Trabalho de Conclusão de Curso em Bacharelado em Ciência da Computação na Universidade Federal da Paraíba (UFPB).
 
-**Stack:** Node.js · TypeScript · Express · Prisma ORM · PostgreSQL
-
----
-
-## Pré-requisitos
-
-- Node.js 18+
-- PostgreSQL 14+
+**Autor:** João Vitor Cardoso Beltrão  
+**Metodologia:** Design Science Research (DSR)
 
 ---
+
+## Visão geral
+
+O sistema é composto por duas áreas:
+
+| Área | Acesso | Descrição |
+|------|--------|-----------|
+| Painel administrativo | Login obrigatório | Gestão de membros, eventos, manutenção e contribuições |
+| Área pública | Sem login | Campanha de arrecadação e Projeto Mão Amiga |
+
+## Módulos
+
+- **Membros** — cadastro, cargos, busca e status (ativo/inativo)
+- **Aniversários** — listagem semanal e mensal de membros ativos
+- **Eventos** — agenda com suporte a eventos recorrentes
+- **Manutenção** — controle de ativos com alertas automáticos (vencido / próximo dos 30 dias)
+- **Campanha Jardim Cidade Universitária** — itens com barra de progresso e confirmação de Pix
+- **Projeto Mão Amiga** — registro de doações físicas e Pix de alimentos
+
+## Stack
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Backend | Node.js · TypeScript · Express · Prisma ORM |
+| Banco de dados | PostgreSQL |
+| Frontend | React · TypeScript · Tailwind CSS · Vite |
+| Autenticação | JWT + bcrypt |
+
+## Estrutura do repositório
+
+```
+igreja-gestao/
+├── backend/
+│   ├── prisma/
+│   │   ├── schema.prisma   # Modelo do banco
+│   │   └── seed.ts         # Dados iniciais
+│   └── src/
+│       ├── controllers/    # Lógica de cada módulo
+│       ├── middlewares/    # Auth JWT + error handler
+│       ├── routes/         # Definição de rotas
+│       └── utils/          # Helpers e Prisma client
+├── frontend/
+│   └── src/
+│       ├── components/     # UI reutilizável + layout
+│       ├── hooks/          # useAuth
+│       ├── pages/          # Uma página por módulo
+│       ├── services/       # Axios configurado
+│       └── types/          # Tipos TypeScript
+└── .github/
+    ├── workflows/          # CI (TypeScript check)
+    └── ISSUE_TEMPLATE/
+```
 
 ## Instalação
 
+Consulte o [CONTRIBUTING.md](./CONTRIBUTING.md) para instruções detalhadas de setup do ambiente.
+
+**Resumo rápido:**
+
 ```bash
-# 1. Instalar dependências
-npm install
+# Backend
+cd backend && npm install
+cp .env.example .env        # configure DATABASE_URL e JWT_SECRET
+npm run db:migrate && npm run db:seed
+npm run dev
 
-# 2. Configurar variáveis de ambiente
+# Frontend (outro terminal)
+cd frontend && npm install
 cp .env.example .env
-# Edite o .env com suas credenciais do PostgreSQL e um JWT_SECRET seguro
-
-# 3. Gerar o Prisma Client
-npm run db:generate
-
-# 4. Rodar as migrations (cria as tabelas no banco)
-npm run db:migrate
-
-# 5. Popular o banco com dados iniciais
-npm run db:seed
-
-# 6. Iniciar em modo desenvolvimento
 npm run dev
 ```
 
-O servidor estará disponível em `http://localhost:3333`.
+Acesse `http://localhost:5173` com `admin@igreja.com` / `admin123`.
 
----
+## Rotas da API
 
-## Variáveis de ambiente
+Documentação completa no [backend/README.md](./backend/README.md).
 
-| Variável | Descrição | Exemplo |
-|---|---|---|
-| `DATABASE_URL` | URL de conexão PostgreSQL | `postgresql://user:pass@localhost:5432/igreja_db` |
-| `JWT_SECRET` | Chave secreta para assinar tokens JWT | string longa e aleatória |
-| `JWT_EXPIRES_IN` | Tempo de expiração do token | `7d` |
-| `PORT` | Porta do servidor | `3333` |
+As rotas públicas (sem autenticação) são:
+- `POST /api/publico/campanha/:itemId/contribuir`
+- `POST /api/publico/mao-amiga/pix`
 
----
+Todas as demais exigem o header `Authorization: Bearer <token>`.
 
-## Rotas principais
+## Licença
 
-### Auth
-| Método | Rota | Descrição |
-|---|---|---|
-| POST | `/api/auth/login` | Login com e-mail e senha |
-| GET | `/api/auth/perfil` | Perfil do usuário autenticado |
-
-### Dashboard
-| Método | Rota | Descrição |
-|---|---|---|
-| GET | `/api/dashboard` | Resumo consolidado |
-
-### Membros
-| Método | Rota | Descrição |
-|---|---|---|
-| GET | `/api/membros` | Listar (filtros: `busca`, `status`) |
-| GET | `/api/membros/aniversariantes` | Aniversariantes (`periodo=semana\|mes`) |
-| GET | `/api/membros/:id` | Detalhes do membro |
-| POST | `/api/membros` | Criar membro |
-| PUT | `/api/membros/:id` | Atualizar membro |
-| DELETE | `/api/membros/:id` | Remover membro |
-
-### Cargos
-| Método | Rota | Descrição |
-|---|---|---|
-| GET | `/api/cargos` | Listar todos os cargos |
-| POST | `/api/cargos` | Criar cargo |
-| PUT | `/api/cargos/:id` | Atualizar cargo |
-| DELETE | `/api/cargos/:id` | Remover cargo |
-
-### Eventos
-| Método | Rota | Descrição |
-|---|---|---|
-| GET | `/api/eventos` | Listar por mês (`mes`, `ano`) |
-| GET | `/api/eventos/proximos` | Próximos 7 dias |
-| POST | `/api/eventos` | Criar evento |
-| PUT | `/api/eventos/:id` | Atualizar evento |
-| DELETE | `/api/eventos/:id` | Remover evento |
-
-### Manutenção
-| Método | Rota | Descrição |
-|---|---|---|
-| GET | `/api/ativos` | Listar ativos com status calculado |
-| GET | `/api/ativos/alertas` | Apenas vencidos e próximos |
-| POST | `/api/ativos` | Cadastrar ativo |
-| PUT | `/api/ativos/:id` | Atualizar ativo |
-| DELETE | `/api/ativos/:id` | Remover ativo |
-| POST | `/api/ativos/:id/manutencoes` | Registrar ocorrência |
-
-### Campanha Jardim Cidade Universitária
-| Método | Rota | Auth | Descrição |
-|---|---|---|---|
-| GET | `/api/campanha/itens` | ✅ | Listar itens com valor arrecadado |
-| POST | `/api/campanha/itens` | ✅ | Criar item |
-| PUT | `/api/campanha/itens/:id` | ✅ | Atualizar item |
-| DELETE | `/api/campanha/itens/:id` | ✅ | Remover item |
-| GET | `/api/campanha/contribuicoes/pendentes` | ✅ | Pendentes de confirmação |
-| PATCH | `/api/campanha/contribuicoes/:id/confirmar` | ✅ | Confirmar |
-| PATCH | `/api/campanha/contribuicoes/:id/recusar` | ✅ | Recusar |
-| POST | `/api/publico/campanha/:itemId/contribuir` | ❌ | Registrar contribuição (público) |
-
-### Projeto Mão Amiga
-| Método | Rota | Auth | Descrição |
-|---|---|---|---|
-| GET | `/api/mao-amiga/doacoes` | ✅ | Listar doações |
-| GET | `/api/mao-amiga/doacoes/pendentes` | ✅ | Pendentes de confirmação |
-| POST | `/api/mao-amiga/doacoes` | ✅ | Registrar doação física (admin) |
-| PATCH | `/api/mao-amiga/doacoes/:id/confirmar` | ✅ | Confirmar Pix |
-| PATCH | `/api/mao-amiga/doacoes/:id/recusar` | ✅ | Recusar Pix |
-| POST | `/api/publico/mao-amiga/pix` | ❌ | Registrar Pix (público) |
-
----
-
-## Credenciais do seed
-
-```
-E-mail: admin@igreja.com
-Senha:  admin123
-```
-
----
-
-## Estrutura do projeto
-
-```
-src/
-├── controllers/     # Lógica de cada módulo
-├── middlewares/     # Autenticação e error handler
-├── routes/          # Definição de todas as rotas
-├── utils/           # Prisma client, AppError, helpers
-├── app.ts           # Configuração do Express
-└── server.ts        # Entrada do servidor
-prisma/
-├── schema.prisma    # Modelo do banco de dados
-└── seed.ts          # Dados iniciais
-```
+Projeto acadêmico. Todos os direitos reservados ao autor.

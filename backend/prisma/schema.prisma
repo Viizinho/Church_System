@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Autenticação ────────────────────────────────────────────────────────────
+
+model Usuario {
+  id             String       @id @default(uuid())
+  nome           String
+  email          String       @unique
+  senhaHash      String       @map("senha_hash")
+  telefone       String?
+  receberAlertas Boolean      @default(true) @map("receber_alertas")
+  criadoEm       DateTime     @default(now()) @map("criado_em")
+  manutencoes    Manutencao[]
+
+  @@map("usuarios")
+}
+
+// ─── Membros ─────────────────────────────────────────────────────────────────
+
+model Membro {
+  id                      String    @id @default(uuid())
+  nomeCompleto            String    @map("nome_completo")
+  dataNascimento          DateTime? @map("data_nascimento") @db.Date
+  telefone                String?
+  email                   String?
+  endereco                String?
+  fotoUrl                 String?   @map("foto_url")
+  status                  StatusMembro @default(ATIVO)
+  consentimentoImagem     Boolean   @default(false) @map("consentimento_imagem")
+  consentimentoImagemData DateTime? @map("consentimento_imagem_data")
+  criadoEm                DateTime  @default(now()) @map("criado_em")
+  atualizadoEm            DateTime  @updatedAt @map("atualizado_em")
+
+  cargos      MembroCargo[]
+  categorias  MembroCategoria[]
+  conjuntos   MembroConjunto[]
+  doacoes     DoacaoAlimento[]
+
+  @@map("membros")
+}
+
+enum StatusMembro {
+  ATIVO
+  INATIVO
+}
+
+model Cargo {
+  id        String        @id @default(uuid())
+  nome      String        @unique
+  descricao String?
+  membros   MembroCargo[]
+
+  @@map("cargos")
+}
+
+model MembroCargo {
+  membroId     String   @map("membro_id")
+  cargoId      String   @map("cargo_id")
+  atribuidoEm  DateTime @default(now()) @map("atribuido_em") @db.Date
+
+  membro Membro @relation(fields: [membroId], references: [id], onDelete: Cascade)
+  cargo  Cargo  @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+
+  @@id([membroId, cargoId])
+  @@map("membro_cargos")
+}
+
+// Categoria: classificação operacional (Professor EBD - subcategoria, Músico, Mídia)
+// separada de Cargo, que representa função/liderança.
+model Categoria {
+  id      String @id @default(uuid())
+  nome    String @unique
+  grupo   String?
+  membros MembroCategoria[]
+
+  @@map("categorias")
+}
+
+model MembroCategoria {
+  membroId    String @map("membro_id")
+  categoriaId String @map("categoria_id")
+
+  membro    Membro    @relation(fields: [membroId], references: [id], onDelete: Cascade)
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@id([membroId, categoriaId])
+  @@map("membro_categorias")
+}
+
+model ConjuntoMusical {
+  id      String @id @default(uuid())
+  nome    String @unique
+  membros MembroConjunto[]
+
+  @@map("conjuntos_musicais")
+}
+
+model MembroConjunto {
+  membroId   String @map("membro_id")
+  conjuntoId String @map("conjunto_id")
+
+  membro   Membro          @relation(fields: [membroId], references: [id], onDelete: Cascade)
+  conjunto ConjuntoMusical @relation(fields: [conjuntoId], references: [id], onDelete: Cascade)
+
+  @@id([membroId, conjuntoId])
+  @@map("membro_conjuntos")
+}
+
+// ─── Eventos ─────────────────────────────────────────────────────────────────
+
+model Evento {
+  id               String            @id @default(uuid())
+  nome             String
+  descricao        String?
+  local            String?
+  inicio           DateTime
+  tipo             TipoEvento
+  recorrencia      RecorrenciaEvento @default(NENHUMA)
+  regraRecorrencia Json?             @map("regra_recorrencia")
+  eventoPaiId      String?           @map("evento_pai_id")
+  criadoEm         DateTime          @default(now()) @map("criado_em")
+  atualizadoEm     DateTime          @updatedAt @map("atualizado_em")
+
+  eventoPai   Evento?  @relation("Ocorrencias", fields: [eventoPaiId], references: [id], onDelete: Cascade)
+  ocorrencias Evento[] @relation("Ocorrencias")
+
+  @@map("eventos")
+}
+
+enum TipoEvento {
+  CULTO
+  REUNIAO
+  ESPECIAL
+}
+
+enum RecorrenciaEvento {
+  NENHUMA
+  SEMANAL
+  MENSAL
+  PERSONALIZADA
+}
+
+// ─── Manutenção ──────────────────────────────────────────────────────────────
+
+model Ativo {
+  id                String       @id @default(uuid())
+  nome              String
+  descricao         String?
+  periodicidadeDias Int          @map("periodicidade_dias")
+  criadoEm          DateTime     @default(now()) @map("criado_em")
+  atualizadoEm      DateTime     @updatedAt @map("atualizado_em")
+
+  manutencoes    Manutencao[]
+  notificacoes   NotificacaoManutencao[]
+
+  @@map("ativos")
+}
+
+model Manutencao {
+  id           String   @id @default(uuid())
+  ativoId      String   @map("ativo_id")
+  data         DateTime @db.Date
+  descricao    String
+  responsavel  String
+  realizadaPor String?  @map("realizada_por")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+
+  ativo   Ativo    @relation(fields: [ativoId], references: [id], onDelete: Cascade)
+  usuario Usuario? @relation(fields: [realizadaPor], references: [id])
+
+  @@map("manutencoes")
+}
+
+model NotificacaoManutencao {
+  id        String            @id @default(uuid())
+  ativoId   String            @map("ativo_id")
+  canal     CanalNotificacao
+  status    String
+  enviadoEm DateTime          @default(now()) @map("enviado_em")
+
+  ativo Ativo @relation(fields: [ativoId], references: [id], onDelete: Cascade)
+
+  @@unique([ativoId, status, canal], name: "unico_por_ciclo")
+  @@map("notificacoes_manutencao")
+}
+
+enum CanalNotificacao {
+  EMAIL
+  WHATSAPP
+}
+
+// ─── Campanha Jardim Cidade Universitária ────────────────────────────────────
+
+model ItemCampanha {
+  id                 String   @id @default(uuid())
+  nome               String
+  descricao          String?
+  valorTotal         Decimal  @map("valor_total") @db.Decimal(10, 2)
+  chavePix           String   @map("chave_pix")
+  whatsappTesoureiro String   @map("whatsapp_tesoureiro")
+  ativo              Boolean  @default(true)
+  ordem              Int      @default(0)
+  criadoEm           DateTime @default(now()) @map("criado_em")
+  atualizadoEm       DateTime @updatedAt @map("atualizado_em")
+
+  contribuicoes Contribuicao[]
+
+  @@map("itens_campanha")
+}
+
+model Contribuicao {
+  id               String             @id @default(uuid())
+  itemId           String             @map("item_id")
+  nomeContribuidor String             @map("nome_contribuidor")
+  valor            Decimal            @db.Decimal(10, 2)
+  comprovanteUrl   String?            @map("comprovante_url")
+  status           StatusContribuicao @default(PENDENTE)
+  motivoRecusa     String?            @map("motivo_recusa")
+  confirmadoPor    String?            @map("confirmado_por")
+  confirmadoEm     DateTime?          @map("confirmado_em")
+  criadoEm         DateTime           @default(now()) @map("criado_em")
+  atualizadoEm     DateTime           @updatedAt @map("atualizado_em")
+
+  item ItemCampanha @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("contribuicoes")
+}
+
+enum StatusContribuicao {
+  PENDENTE
+  CONFIRMADO
+  RECUSADO
+}
+
+// ─── Projeto Mão Amiga ───────────────────────────────────────────────────────
+
+model MetaCesta {
+  id                   String   @id @default(uuid())
+  nomeItem             String   @map("nome_item")
+  unidade              String   @default("kg")
+  quantidadeNecessaria Decimal  @db.Decimal(10, 2) @map("quantidade_necessaria")
+  ativo                Boolean  @default(true)
+  criadoEm             DateTime @default(now()) @map("criado_em")
+
+  doacoes DoacaoAlimento[]
+
+  @@map("metas_cesta")
+}
+
+model DoacaoAlimento {
+  id                 String       @id @default(uuid())
+  membroId           String?      @map("membro_id")
+  nomeDoador         String?      @map("nome_doador")
+  data               DateTime     @db.Date
+  itemDoado          String       @map("item_doado")
+  quantidade         String
+  quantidadeNumerica Decimal?     @db.Decimal(10, 2) @map("quantidade_numerica")
+  tipo               TipoDoacao
+  comprovanteUrl     String?      @map("comprovante_url")
+  status             StatusDoacao @default(CONFIRMADO)
+  metaCestaId        String?      @map("meta_cesta_id")
+  criadoEm           DateTime     @default(now()) @map("criado_em")
+
+  membro    Membro?    @relation(fields: [membroId], references: [id])
+  metaCesta MetaCesta? @relation(fields: [metaCestaId], references: [id])
+
+  @@map("doacoes_alimentos")
+}
+
+enum TipoDoacao {
+  FISICA
+  PIX
+}
+
+enum StatusDoacao {
+  PENDENTE
+  CONFIRMADO
+  RECUSADO
+}
+
+// ─── Landing Page pública ─────────────────────────────────────────────────────
+
+model ConfiguracaoIgreja {
+  id              String   @id @default("singleton")
+  sobre           String?
+  endereco        String?
+  instagramUrl    String?  @map("instagram_url")
+  facebookUrl     String?  @map("facebook_url")
+  whatsappContato String?  @map("whatsapp_contato")
+  atualizadoEm    DateTime @updatedAt @map("atualizado_em")
+
+  @@map("configuracao_igreja")
+}

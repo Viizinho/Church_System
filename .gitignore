@@ -3,3 +3,6 @@ dist/
 .env
 *.js.map
 prisma/migrations/
+.DS_Store
+coverage/
+*.log
