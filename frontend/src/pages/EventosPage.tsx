@@ -11,8 +11,12 @@ import EmptyState from '@/components/ui/EmptyState'
 import dayjs from 'dayjs'
 
 const tipoLabel: Record<string, string> = { CULTO: 'Culto', REUNIAO: 'Reunião', ESPECIAL: 'Especial' }
-const recLabel: Record<string, string> = { NENHUMA: 'Único', SEMANAL: 'Semanal', MENSAL: 'Mensal' }
-const recVariant: Record<string, 'purple'|'gray'> = { NENHUMA: 'gray', SEMANAL: 'purple', MENSAL: 'purple' }
+const recLabel: Record<string, string> = { NENHUMA: 'Único', SEMANAL: 'Semanal', MENSAL: 'Mensal', PERSONALIZADA: 'Personalizada' }
+const recVariant: Record<string, 'purple' | 'gray'> = { NENHUMA: 'gray', SEMANAL: 'purple', MENSAL: 'purple', PERSONALIZADA: 'purple' }
+const DIAS_SEMANA = [
+  { valor: 0, label: 'Dom' }, { valor: 1, label: 'Seg' }, { valor: 2, label: 'Ter' },
+  { valor: 3, label: 'Qua' }, { valor: 4, label: 'Qui' }, { valor: 5, label: 'Sex' }, { valor: 6, label: 'Sáb' },
+]
 
 export default function EventosPage() {
   const [eventos, setEventos] = useState<Evento[]>([])
@@ -22,7 +26,16 @@ export default function EventosPage() {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Evento | null>(null)
   const [form, setForm] = useState({ nome: '', descricao: '', local: '', inicio: '', tipo: 'CULTO', recorrencia: 'NENHUMA' })
+  const [diasSemana, setDiasSemana] = useState<number[]>([])
+  const [intervaloSemanas, setIntervaloSemanas] = useState(1)
+  const [criterioTipo, setCriterioTipo] = useState<'OCORRENCIAS' | 'DATA'>('OCORRENCIAS')
+  const [criterioOcorrencias, setCriterioOcorrencias] = useState(10)
+  const [criterioData, setCriterioData] = useState('')
   const [saving, setSaving] = useState(false)
+
+  function alternarDia(dia: number) {
+    setDiasSemana((atual) => (atual.includes(dia) ? atual.filter((d) => d !== dia) : [...atual, dia]))
+  }
 
   async function load() {
     setLoading(true)
@@ -36,18 +49,45 @@ export default function EventosPage() {
   function openCreate() {
     setEditing(null)
     setForm({ nome: '', descricao: '', local: '', inicio: '', tipo: 'CULTO', recorrencia: 'NENHUMA' })
+    setDiasSemana([])
+    setIntervaloSemanas(1)
+    setCriterioTipo('OCORRENCIAS')
+    setCriterioOcorrencias(10)
+    setCriterioData('')
     setModal(true)
   }
 
   function openEdit(e: Evento) {
     setEditing(e)
     setForm({ nome: e.nome, descricao: e.descricao ?? '', local: e.local ?? '', inicio: dayjs(e.inicio).format('YYYY-MM-DDTHH:mm'), tipo: e.tipo, recorrencia: e.recorrencia })
+    setDiasSemana([])
+    setIntervaloSemanas(1)
+    setCriterioTipo('OCORRENCIAS')
+    setCriterioOcorrencias(10)
+    setCriterioData('')
     setModal(true)
   }
 
   async function handleSave() {
     setSaving(true)
-    const payload = { ...form, inicio: new Date(form.inicio).toISOString(), descricao: form.descricao || null, local: form.local || null }
+    const payload: Record<string, unknown> = {
+      ...form,
+      inicio: new Date(form.inicio).toISOString(),
+      descricao: form.descricao || null,
+      local: form.local || null,
+    }
+
+    if (form.recorrencia === 'PERSONALIZADA') {
+      payload.regraRecorrencia = {
+        diasSemana,
+        intervaloSemanas,
+        criterioParada:
+          criterioTipo === 'DATA'
+            ? { tipo: 'DATA', valor: criterioData }
+            : { tipo: 'OCORRENCIAS', valor: criterioOcorrencias },
+      }
+    }
+
     if (editing) await api.put(`/eventos/${editing.id}`, payload)
     else await api.post('/eventos', payload)
     setSaving(false)
@@ -122,8 +162,73 @@ export default function EventosPage() {
               <option value="NENHUMA">Único</option>
               <option value="SEMANAL">Semanal</option>
               <option value="MENSAL">Mensal</option>
+              <option value="PERSONALIZADA">Personalizada</option>
             </Select>
           </div>
+
+          {form.recorrencia === 'PERSONALIZADA' && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-4">
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-2">Repetir nos dias</p>
+                <div className="flex gap-1.5">
+                  {DIAS_SEMANA.map((d) => (
+                    <button
+                      type="button"
+                      key={d.valor}
+                      onClick={() => alternarDia(d.valor)}
+                      className={`w-9 h-9 rounded-full text-xs font-medium transition-colors ${
+                        diasSemana.includes(d.valor) ? 'bg-primary-500 text-white' : 'bg-white border border-gray-300 text-gray-600'
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-600">Repetir a cada</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={intervaloSemanas}
+                  onChange={(e) => setIntervaloSemanas(Number(e.target.value))}
+                  className="w-16 h-8 rounded-lg border border-gray-300 px-2 text-sm"
+                />
+                <span className="text-xs text-gray-600">semana(s)</span>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-2">Critério de parada</p>
+                <div className="flex gap-4 mb-2 text-xs">
+                  <label className="flex items-center gap-1">
+                    <input type="radio" checked={criterioTipo === 'OCORRENCIAS'} onChange={() => setCriterioTipo('OCORRENCIAS')} />
+                    Número de ocorrências
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input type="radio" checked={criterioTipo === 'DATA'} onChange={() => setCriterioTipo('DATA')} />
+                    Até uma data
+                  </label>
+                </div>
+                {criterioTipo === 'OCORRENCIAS' ? (
+                  <input
+                    type="number"
+                    min={1}
+                    value={criterioOcorrencias}
+                    onChange={(e) => setCriterioOcorrencias(Number(e.target.value))}
+                    className="w-24 h-8 rounded-lg border border-gray-300 px-2 text-sm"
+                  />
+                ) : (
+                  <input
+                    type="date"
+                    value={criterioData}
+                    onChange={(e) => setCriterioData(e.target.value)}
+                    className="h-8 rounded-lg border border-gray-300 px-2 text-sm"
+                  />
+                )}
+              </div>
+            </div>
+          )}
           <Input label="Descrição" value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setModal(false)}>Cancelar</Button>

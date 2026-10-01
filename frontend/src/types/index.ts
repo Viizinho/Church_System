@@ -19,6 +19,27 @@ export interface MembroCargo {
   cargo: Cargo
 }
 
+export interface Categoria {
+  id: string
+  nome: string
+  grupo?: string | null
+}
+
+export interface MembroCategoria {
+  categoriaId: string
+  categoria: Categoria
+}
+
+export interface ConjuntoMusical {
+  id: string
+  nome: string
+}
+
+export interface MembroConjunto {
+  conjuntoId: string
+  conjunto: ConjuntoMusical
+}
+
 export interface Membro {
   id: string
   nomeCompleto: string
@@ -29,12 +50,15 @@ export interface Membro {
   fotoUrl?: string | null
   status: StatusMembro
   cargos: MembroCargo[]
+  categorias: MembroCategoria[]
+  conjuntos: MembroConjunto[]
+  consentimentoImagem: boolean
   criadoEm: string
 }
 
 // ─── Eventos ──────────────────────────────────────────────────────────────────
 export type TipoEvento = 'CULTO' | 'REUNIAO' | 'ESPECIAL'
-export type RecorrenciaEvento = 'NENHUMA' | 'SEMANAL' | 'MENSAL'
+export type RecorrenciaEvento = 'NENHUMA' | 'SEMANAL' | 'MENSAL' | 'PERSONALIZADA'
 
 export interface Evento {
   id: string
@@ -44,6 +68,7 @@ export interface Evento {
   inicio: string
   tipo: TipoEvento
   recorrencia: RecorrenciaEvento
+  regraRecorrencia?: unknown
 }
 
 // ─── Manutenção ───────────────────────────────────────────────────────────────

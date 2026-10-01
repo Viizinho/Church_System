@@ -10,33 +10,74 @@ import Spinner from '@/components/ui/Spinner'
 import EmptyState from '@/components/ui/EmptyState'
 import dayjs from 'dayjs'
 
+interface MetaCesta {
+  id: string
+  nomeItem: string
+  unidade: string
+  restante: number
+  completo: boolean
+}
+
 export default function MaoAmigaAdminPage() {
   const [doacoes, setDoacoes] = useState<DoacaoAlimento[]>([])
   const [pendentes, setPendentes] = useState<DoacaoAlimento[]>([])
   const [membros, setMembros] = useState<Membro[]>([])
+  const [metas, setMetas] = useState<MetaCesta[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
-  const [form, setForm] = useState({ membroId: '', nomeDoador: '', data: dayjs().format('YYYY-MM-DD'), itemDoado: '', quantidade: '', tipo: 'FISICA' })
+  const [form, setForm] = useState({
+    membroId: '',
+    nomeDoador: '',
+    data: dayjs().format('YYYY-MM-DD'),
+    itemDoado: '',
+    quantidade: '',
+    tipo: 'FISICA',
+    metaCestaId: '',
+    quantidadeNumerica: '',
+  })
   const [saving, setSaving] = useState(false)
 
   async function load() {
     setLoading(true)
-    const [dRes, pRes, mRes] = await Promise.all([api.get('/mao-amiga/doacoes'), api.get('/mao-amiga/doacoes/pendentes'), api.get('/membros', { params: { status: 'ATIVO' } })])
+    const [dRes, pRes, mRes, metasRes] = await Promise.all([
+      api.get('/mao-amiga/doacoes'),
+      api.get('/mao-amiga/doacoes/pendentes'),
+      api.get('/membros', { params: { status: 'ATIVO' } }),
+      api.get('/mao-amiga/metas'),
+    ])
     setDoacoes(dRes.data)
     setPendentes(pRes.data)
     setMembros(mRes.data)
+    setMetas(metasRes.data)
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
+  const metaSelecionada = metas.find((m) => m.id === form.metaCestaId)
+
   async function handleSave() {
     setSaving(true)
-    await api.post('/mao-amiga/doacoes', {
-      ...form,
-      membroId: form.membroId || null,
-      nomeDoador: form.nomeDoador || null,
-    })
+    const payload = metaSelecionada
+      ? {
+          membroId: form.membroId || null,
+          nomeDoador: form.nomeDoador || null,
+          data: form.data,
+          itemDoado: metaSelecionada.nomeItem,
+          quantidade: `${form.quantidadeNumerica} ${metaSelecionada.unidade}`,
+          quantidadeNumerica: Number(form.quantidadeNumerica),
+          metaCestaId: metaSelecionada.id,
+          tipo: form.tipo,
+        }
+      : {
+          membroId: form.membroId || null,
+          nomeDoador: form.nomeDoador || null,
+          data: form.data,
+          itemDoado: form.itemDoado,
+          quantidade: form.quantidade,
+          tipo: form.tipo,
+        }
+    await api.post('/mao-amiga/doacoes', payload)
     setSaving(false)
     setModal(false)
     load()
@@ -57,7 +98,7 @@ export default function MaoAmigaAdminPage() {
           <h1 className="text-xl font-semibold text-gray-900">Projeto Mão Amiga</h1>
           <p className="text-sm text-gray-500">Doações de alimentos</p>
         </div>
-        <Button onClick={() => { setForm({ membroId: '', nomeDoador: '', data: dayjs().format('YYYY-MM-DD'), itemDoado: '', quantidade: '', tipo: 'FISICA' }); setModal(true) }}>+ Registrar doação</Button>
+        <Button onClick={() => { setForm({ membroId: '', nomeDoador: '', data: dayjs().format('YYYY-MM-DD'), itemDoado: '', quantidade: '', tipo: 'FISICA', metaCestaId: '', quantidadeNumerica: '' }); setModal(true) }}>+ Registrar doação</Button>
       </div>
 
       {pendentes.length > 0 && (
@@ -118,11 +159,44 @@ export default function MaoAmigaAdminPage() {
               <option value="PIX">Pix</option>
             </Select>
           </div>
-          <Input label="Item doado *" placeholder="Ex: Arroz 5kg" value={form.itemDoado} onChange={(e) => setForm((f) => ({ ...f, itemDoado: e.target.value }))} />
-          <Input label="Quantidade *" placeholder="Ex: 2 pacotes" value={form.quantidade} onChange={(e) => setForm((f) => ({ ...f, quantidade: e.target.value }))} />
+          <Select
+            label="Vincular a uma meta da cesta (opcional)"
+            value={form.metaCestaId}
+            onChange={(e) => setForm((f) => ({ ...f, metaCestaId: e.target.value, quantidadeNumerica: '' }))}
+          >
+            <option value="">— Doação livre (sem meta) —</option>
+            {metas.filter((m) => !m.completo).map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nomeItem} — faltam {m.restante} {m.unidade}
+              </option>
+            ))}
+          </Select>
+
+          {metaSelecionada ? (
+            <Input
+              label={`Quantidade (${metaSelecionada.unidade}) — máximo ${metaSelecionada.restante}`}
+              type="number"
+              min={0.1}
+              step={0.1}
+              max={metaSelecionada.restante}
+              value={form.quantidadeNumerica}
+              onChange={(e) => setForm((f) => ({ ...f, quantidadeNumerica: e.target.value }))}
+            />
+          ) : (
+            <>
+              <Input label="Item doado *" placeholder="Ex: Arroz 5kg" value={form.itemDoado} onChange={(e) => setForm((f) => ({ ...f, itemDoado: e.target.value }))} />
+              <Input label="Quantidade *" placeholder="Ex: 2 pacotes" value={form.quantidade} onChange={(e) => setForm((f) => ({ ...f, quantidade: e.target.value }))} />
+            </>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button onClick={handleSave} loading={saving}>Salvar</Button>
+            <Button
+              onClick={handleSave}
+              loading={saving}
+              disabled={!!metaSelecionada && (!form.quantidadeNumerica || Number(form.quantidadeNumerica) > metaSelecionada.restante)}
+            >
+              Salvar
+            </Button>
           </div>
         </div>
       </Modal>

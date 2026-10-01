@@ -1,16 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-
-interface Usuario {
-  id: string
-  nome: string
-  email: string
-}
+import api from '@/services/api'
+import type { Usuario } from '@/types'
 
 interface AuthContextValue {
   token: string | null
   usuario: Usuario | null
   carregando: boolean
-  login: (token: string, usuario: Usuario) => void
+  login: (email: string, senha: string) => Promise<void>
   logout: () => void
 }
 
@@ -22,8 +18,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
-    const tokenSalvo = localStorage.getItem('igreja:token')
-    const usuarioSalvo = localStorage.getItem('igreja:usuario')
+    const tokenSalvo = localStorage.getItem('token')
+    const usuarioSalvo = localStorage.getItem('usuario')
     if (tokenSalvo && usuarioSalvo) {
       setToken(tokenSalvo)
       setUsuario(JSON.parse(usuarioSalvo))
@@ -31,16 +27,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCarregando(false)
   }, [])
 
-  function login(novoToken: string, novoUsuario: Usuario) {
-    localStorage.setItem('igreja:token', novoToken)
-    localStorage.setItem('igreja:usuario', JSON.stringify(novoUsuario))
-    setToken(novoToken)
-    setUsuario(novoUsuario)
+  async function login(email: string, senha: string) {
+    const { data } = await api.post('/auth/login', { email, senha })
+    localStorage.setItem('token', data.token)
+    localStorage.setItem('usuario', JSON.stringify(data.usuario))
+    setToken(data.token)
+    setUsuario(data.usuario)
   }
 
   function logout() {
-    localStorage.removeItem('igreja:token')
-    localStorage.removeItem('igreja:usuario')
+    localStorage.removeItem('token')
+    localStorage.removeItem('usuario')
     setToken(null)
     setUsuario(null)
   }

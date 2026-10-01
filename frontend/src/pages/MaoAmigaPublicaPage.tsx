@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from '@/services/api'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -7,10 +7,26 @@ const PIX_KEY = 'cesta.solidaria@gmail.com'
 const WHATSAPP = '5583999990010'
 const ITENS_ACEITOS = ['Arroz (pacote 5 kg)', 'Feijão (pacote 1 kg)', 'Macarrão', 'Óleo de cozinha', 'Leite em pó', 'Açúcar']
 
+interface MetaCesta {
+  id: string
+  nomeItem: string
+  unidade: string
+  restante: number
+  completo: boolean
+}
+
 export default function MaoAmigaPublicaPage() {
   const [nome, setNome] = useState('')
   const [enviado, setEnviado] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [metas, setMetas] = useState<MetaCesta[]>([])
+
+  useEffect(() => {
+    api
+      .get('/publico/mao-amiga/metas')
+      .then((r) => setMetas(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setMetas([]))
+  }, [])
 
   async function handlePix() {
     if (!nome) return
@@ -30,7 +46,34 @@ export default function MaoAmigaPublicaPage() {
         <p className="text-green-200 mt-2 max-w-md mx-auto text-sm">Ajudamos famílias em situação de vulnerabilidade com doações de alimentos.</p>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="max-w-2xl mx-auto px-4 pt-8">
+        {metas.length > 0 && (
+          <div className="mb-6">
+            <p className="text-sm font-medium text-gray-700 mb-3">O que ainda está faltando para montar as cestas:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {metas.map((meta) => (
+                <div
+                  key={meta.id}
+                  className={`rounded-xl border p-3 text-center ${
+                    meta.completo ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-gray-900">{meta.nomeItem}</p>
+                  {meta.completo ? (
+                    <p className="text-xs text-green-600 mt-1">Meta atingida! 🎉</p>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Faltam {meta.restante} {meta.unidade}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 pb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Doação física */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-1">📦 Doação de alimentos</h2>

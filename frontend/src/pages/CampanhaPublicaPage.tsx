@@ -22,6 +22,24 @@ export default function CampanhaPublicaPage() {
     api.get('/campanha/itens').then((r) => { setItens(r.data); setLoading(false) })
   }, [])
 
+  // Atualização dinâmica: o backend emite um evento sempre que uma contribuição
+  // é confirmada, então o valor arrecadado atualiza sem precisar recarregar a página.
+  useEffect(() => {
+    const baseURL = (api.defaults.baseURL ?? '/api').replace(/\/$/, '')
+    const eventSource = new EventSource(`${baseURL}/publico/campanha/eventos`)
+
+    eventSource.onmessage = (evento) => {
+      try {
+        const { itemId, valorArrecadado } = JSON.parse(evento.data)
+        setItens((atual) => atual.map((item) => (item.id === itemId ? { ...item, valorArrecadado } : item)))
+      } catch {
+        // ignora mensagens mal formadas
+      }
+    }
+
+    return () => eventSource.close()
+  }, [])
+
   function selectItem(item: ItemCampanha) {
     setSelected(item)
     setValor(null)

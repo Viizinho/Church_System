@@ -1,57 +1,51 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './hooks/useAuth'
-import { RotaProtegida } from './components/RotaProtegida'
-import { ErrorBoundary } from './components/ErrorBoundary'
-import { DashboardLayout } from './layouts/DashboardLayout'
+import { AuthProvider } from '@/hooks/useAuth'
+import { RotaProtegida } from '@/components/routing/RotaProtegida'
+import AdminLayout from '@/components/layout/AdminLayout'
 
-import { LandingPage } from './pages/publico/LandingPage'
-import { Login } from './pages/publico/Login'
-import { Dashboard } from './pages/admin/Dashboard'
-import { MembrosLista } from './pages/admin/membros/MembrosLista'
-import { MembroForm } from './pages/admin/membros/MembroForm'
-import { MaoAmigaForm } from './pages/admin/maoAmiga/MaoAmigaForm'
-import { EventosLista } from './pages/admin/eventos/EventosLista'
-import { EventoRecorrenciaForm } from './pages/admin/eventos/EventoRecorrenciaForm'
-import { AtivosLista } from './pages/admin/ativos/AtivosLista'
-import { CampanhaAdmin } from './pages/admin/campanha/CampanhaAdmin'
+import LandingPage from '@/pages/LandingPage'
+import LoginPage from '@/pages/LoginPage'
+import CampanhaPublicaPage from '@/pages/CampanhaPublicaPage'
+import MaoAmigaPublicaPage from '@/pages/MaoAmigaPublicaPage'
+import DashboardPage from '@/pages/DashboardPage'
+import MembrosPage from '@/pages/MembrosPage'
+import AniversariosPage from '@/pages/AniversariosPage'
+import EventosPage from '@/pages/EventosPage'
+import ManutencaoPage from '@/pages/ManutencaoPage'
+import CampanhaAdminPage from '@/pages/CampanhaAdminPage'
+import MaoAmigaAdminPage from '@/pages/MaoAmigaAdminPage'
 
-export function App() {
+export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <ErrorBoundary fallbackTitulo="Ocorreu um erro inesperado na página.">
-          <Routes>
+        <Routes>
           {/* Público */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/contribuir" element={<CampanhaPublicaPage />} />
+          <Route path="/doar" element={<MaoAmigaPublicaPage />} />
 
-          {/* Admin — protegido por autenticação */}
+          {/* Admin — protegido por autenticação (rotas sem prefixo, como o AdminLayout espera) */}
           <Route
-            path="/admin"
             element={
               <RotaProtegida>
-                <DashboardLayout />
+                <AdminLayout />
               </RotaProtegida>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="membros" element={<MembrosLista />} />
-            <Route path="membros/novo" element={<MembroForm />} />
-            <Route path="membros/:id" element={<MembroForm />} />
-            <Route path="eventos" element={<EventosLista />} />
-            <Route path="eventos/novo" element={<EventoRecorrenciaForm />} />
-            <Route path="ativos" element={<AtivosLista />} />
-            <Route path="campanha" element={<CampanhaAdmin />} />
-            <Route path="mao-amiga" element={<MaoAmigaForm />} />
-            {/* demais rotas admin existentes (detalhe de ativo, etc.) continuam aqui */}
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="membros" element={<MembrosPage />} />
+            <Route path="aniversarios" element={<AniversariosPage />} />
+            <Route path="eventos" element={<EventosPage />} />
+            <Route path="manutencao" element={<ManutencaoPage />} />
+            <Route path="campanha" element={<CampanhaAdminPage />} />
+            <Route path="mao-amiga" element={<MaoAmigaAdminPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </ErrorBoundary>
+        </Routes>
       </BrowserRouter>
     </AuthProvider>
   )
 }
-
-export default App
