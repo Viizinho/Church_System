@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -27,11 +28,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-sm mb-4">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm font-medium text-white/90 hover:text-white transition-colors"
+        >
+          <ArrowLeft size={16} /> Voltar à página pública
+        </Link>
+      </div>
+
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">⛪</div>
-          <h1 className="text-xl font-bold text-gray-900">Gestão Igreja</h1>
+          <h1 className="text-xl font-bold text-gray-900">Login Administrativo</h1>
           <p className="text-sm text-gray-500 mt-1">Assembleia de Deus JCU</p>
         </div>
 

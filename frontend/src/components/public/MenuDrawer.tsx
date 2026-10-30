@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { Lock, Menu, X } from 'lucide-react'
 
 const LINKS = [
+  { href: '#redes-sociais', label: 'Redes sociais' },
   { href: '#eventos', label: 'Eventos' },
   { href: '#campanha', label: 'Campanha' },
-  { href: '#mao-amiga', label: 'Projeto Mão Amiga' },
+  { href: '#mao-amiga', label: 'Mão Amiga' },
 ]
 
 export default function MenuDrawer() {
@@ -23,8 +24,11 @@ export default function MenuDrawer() {
             {link.label}
           </a>
         ))}
-        <Link to="/login" className="text-primary-600 font-semibold">
-          Área Restrita
+        <Link
+          to="/login"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-500 text-white font-medium hover:bg-primary-600 transition-colors"
+        >
+          <Lock size={14} /> Login ADM
         </Link>
       </nav>
 
@@ -40,8 +44,12 @@ export default function MenuDrawer() {
               </a>
             ))}
             <hr />
-            <Link to="/login" onClick={() => setAberto(false)} className="text-primary-600 text-lg font-semibold">
-              Área Restrita
+            <Link
+              to="/login"
+              onClick={() => setAberto(false)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary-500 text-white font-semibold"
+            >
+              <Lock size={16} /> Login ADM
             </Link>
           </div>
           <div className="flex-1 bg-black/40" onClick={() => setAberto(false)} />

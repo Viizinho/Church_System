@@ -15,7 +15,12 @@ interface MetaCesta {
   completo: boolean
 }
 
-export default function MaoAmigaPublicaPage() {
+interface Props {
+  /** Quando true, a página é exibida como seção da landing (sem cabeçalho próprio nem altura de tela cheia). */
+  embedded?: boolean
+}
+
+export default function MaoAmigaPublicaPage({ embedded = false }: Props) {
   const [nome, setNome] = useState('')
   const [enviado, setEnviado] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -39,14 +44,16 @@ export default function MaoAmigaPublicaPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-green-700 text-white py-10 px-4 text-center">
-        <div className="text-4xl mb-3">🤝</div>
-        <h1 className="text-2xl font-bold">Projeto Mão Amiga</h1>
-        <p className="text-green-200 mt-2 max-w-md mx-auto text-sm">Ajudamos famílias em situação de vulnerabilidade com doações de alimentos.</p>
-      </div>
+    <div className={embedded ? '' : 'min-h-screen bg-gray-50'}>
+      {!embedded && (
+        <div className="bg-green-700 text-white py-10 px-4 text-center">
+          <div className="text-4xl mb-3">🤝</div>
+          <h1 className="text-2xl font-bold">Projeto Mão Amiga</h1>
+          <p className="text-green-200 mt-2 max-w-md mx-auto text-sm">Ajudamos famílias em situação de vulnerabilidade com doações de alimentos.</p>
+        </div>
+      )}
 
-      <div className="max-w-2xl mx-auto px-4 pt-8">
+      <div className={`max-w-2xl mx-auto px-4 ${embedded ? 'pt-0' : 'pt-8'}`}>
         {metas.length > 0 && (
           <div className="mb-6">
             <p className="text-sm font-medium text-gray-700 mb-3">O que ainda está faltando para montar as cestas:</p>

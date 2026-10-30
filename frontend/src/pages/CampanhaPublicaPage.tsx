@@ -8,7 +8,12 @@ import Spinner from '@/components/ui/Spinner'
 
 const valoresSugeridos = [50, 100, 250, 500]
 
-export default function CampanhaPublicaPage() {
+interface Props {
+  /** Quando true, a página é exibida como seção da landing (sem cabeçalho próprio nem altura de tela cheia). */
+  embedded?: boolean
+}
+
+export default function CampanhaPublicaPage({ embedded = false }: Props) {
   const [itens, setItens] = useState<ItemCampanha[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<ItemCampanha | null>(null)
@@ -19,7 +24,12 @@ export default function CampanhaPublicaPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    api.get('/campanha/itens').then((r) => { setItens(r.data); setLoading(false) })
+    // Rota pública (a /campanha/itens exige login e derrubaria o visitante na tela de admin)
+    api
+      .get('/publico/campanha')
+      .then((r) => setItens(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setItens([]))
+      .finally(() => setLoading(false))
   }, [])
 
   // Atualização dinâmica: o backend emite um evento sempre que uma contribuição
@@ -64,20 +74,25 @@ export default function CampanhaPublicaPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className={`${embedded ? 'py-12' : 'min-h-screen'} flex items-center justify-center`}>
       <Spinner />
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-primary-600 text-white py-10 px-4 text-center">
-        <div className="text-4xl mb-3">⛪</div>
-        <h1 className="text-2xl font-bold">Campanha Jardim Cidade Universitária</h1>
-        <p className="text-primary-200 mt-2 max-w-md mx-auto text-sm">Cada contribuição ajuda a equipar nossa igreja. Escolha um item e colabore com o valor que puder.</p>
-      </div>
+    <div className={embedded ? '' : 'min-h-screen bg-gray-50'}>
+      {!embedded && (
+        <div className="bg-primary-600 text-white py-10 px-4 text-center">
+          <div className="text-4xl mb-3">⛪</div>
+          <h1 className="text-2xl font-bold">Campanha Jardim Cidade Universitária</h1>
+          <p className="text-primary-200 mt-2 max-w-md mx-auto text-sm">Cada contribuição ajuda a equipar nossa igreja. Escolha um item e colabore com o valor que puder.</p>
+        </div>
+      )}
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className={`max-w-3xl mx-auto px-4 ${embedded ? 'py-2' : 'py-8'}`}>
+        {itens.length === 0 && (
+          <p className="text-center text-sm text-gray-400 py-8">Nenhum item de campanha ativo no momento.</p>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {itens.map((item) => {
             const pct = Math.min(100, (item.valorArrecadado / item.valorTotal) * 100)
