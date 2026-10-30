@@ -3,6 +3,7 @@ import api from '@/services/api'
 import type { Membro } from '@/types'
 import Card, { CardBody, CardHeader } from '@/components/ui/Card'
 import Spinner from '@/components/ui/Spinner'
+import PageHeader from '@/components/ui/PageHeader'
 import { formatarDiaMes } from '@/utils/data'
 
 type MembroAniv = Membro & { diffDias: number; proximoAniversario: string }
@@ -11,16 +12,17 @@ export default function AniversariosPage() {
   const [semana, setSemana] = useState<MembroAniv[]>([])
   const [mes, setMes] = useState<MembroAniv[]>([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      api.get('/membros/aniversariantes?periodo=semana'),
-      api.get('/membros/aniversariantes?periodo=mes'),
-    ]).then(([s, m]) => {
-      setSemana(s.data)
-      setMes(m.data.filter((m: MembroAniv) => m.diffDias > 7))
-      setLoading(false)
-    })
+    // Uma única chamada: o período "mês" já inclui a semana (diffDias ≤ 7)
+    api.get<MembroAniv[]>('/membros/aniversariantes', { params: { periodo: 'mes' } })
+      .then(({ data }) => {
+        setSemana(data.filter((m) => m.diffDias <= 7))
+        setMes(data.filter((m) => m.diffDias > 7))
+      })
+      .catch(() => setErro(true))
+      .finally(() => setLoading(false))
   }, [])
 
   function MembroRow({ m }: { m: MembroAniv }) {
@@ -48,11 +50,9 @@ export default function AniversariosPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Aniversários</h1>
-        <p className="text-sm text-gray-500">Apenas membros ativos</p>
-      </div>
+    <div className="p-4 sm:p-6 max-w-6xl">
+      <PageHeader title="Aniversários" subtitle="Apenas membros ativos" />
+      {erro && <p role="alert" className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">Não foi possível carregar os aniversários.</p>}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>

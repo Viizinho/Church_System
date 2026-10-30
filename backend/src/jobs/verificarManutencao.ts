@@ -17,39 +17,42 @@ async function verificarManutencoes() {
     const status = calcularStatus(proxima)
 
     if (status !== 'VENCIDO' && status !== 'PROXIMO') continue
-
-    for (const usuario of destinatarios) {
-      await dispararSeNecessario(ativo.id, ativo.nome, status, usuario, proxima)
-    }
+    await dispararSeNecessario(ativo.id, ativo.nome, status, destinatarios, proxima)
   }
 }
 
+/**
+ * Envia o alerta a TODOS os destinatários uma única vez por ciclo (ativo + status + canal).
+ * Antes, o registro de "já enviado" era gravado após o 1º destinatário e os demais nunca eram avisados.
+ */
 async function dispararSeNecessario(
   ativoId: string,
   nomeAtivo: string,
   status: 'VENCIDO' | 'PROXIMO',
-  usuario: { email: string; telefone: string | null },
+  usuarios: { email: string; telefone: string | null }[],
   proxima: Date | null
 ) {
+  const data = proxima?.toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' })
   const mensagem =
     status === 'VENCIDO'
-      ? `⚠️ A manutenção de "${nomeAtivo}" está VENCIDA (prevista para ${proxima?.toLocaleDateString('pt-BR')}).`
-      : `🔔 A manutenção de "${nomeAtivo}" vence em breve, em ${proxima?.toLocaleDateString('pt-BR')}.`
+      ? `⚠️ A manutenção de "${nomeAtivo}" está VENCIDA (prevista para ${data}).`
+      : `🔔 A manutenção de "${nomeAtivo}" vence em breve, em ${data}.`
 
   const jaEnviadoEmail = await prisma.notificacaoManutencao.findUnique({
     where: { unico_por_ciclo: { ativoId, status, canal: 'EMAIL' } },
   })
   if (!jaEnviadoEmail) {
-    await enviarEmail(usuario.email, `Alerta de manutenção — ${nomeAtivo}`, mensagem)
+    for (const u of usuarios) await enviarEmail(u.email, `Alerta de manutenção — ${nomeAtivo}`, mensagem)
     await prisma.notificacaoManutencao.create({ data: { ativoId, status, canal: 'EMAIL' } })
   }
 
-  if (usuario.telefone) {
+  const comTelefone = usuarios.filter((u) => u.telefone)
+  if (comTelefone.length > 0) {
     const jaEnviadoWhats = await prisma.notificacaoManutencao.findUnique({
       where: { unico_por_ciclo: { ativoId, status, canal: 'WHATSAPP' } },
     })
     if (!jaEnviadoWhats) {
-      await enviarWhatsApp(usuario.telefone, mensagem)
+      for (const u of comTelefone) await enviarWhatsApp(u.telefone!, mensagem)
       await prisma.notificacaoManutencao.create({ data: { ativoId, status, canal: 'WHATSAPP' } })
     }
   }
@@ -77,13 +80,19 @@ async function limparNotificacoesResolvidas() {
 }
 
 export function iniciarCronManutencao() {
-  // Todos os dias às 08:00 (horário do servidor)
-  cron.schedule('0 8 * * *', async () => {
-    console.log('[cron] Verificando manutenções pendentes...')
-    await limparNotificacoesResolvidas()
-    await verificarManutencoes()
-  })
+  // Todos os dias às 08:00 de Fortaleza. Sem try/catch, um erro de rede (SMTP, banco) viraria
+  // "unhandled rejection" e derrubaria o servidor.
+  cron.schedule(
+    '0 8 * * *',
+    async () => {
+      try {
+        console.log('[cron] Verificando manutenções pendentes...')
+        await limparNotificacoesResolvidas()
+        await verificarManutencoes()
+      } catch (e) {
+        console.error('[cron] Falha ao verificar manutenções:', (e as Error).message)
+      }
+    },
+    { timezone: 'America/Fortaleza' }
+  )
 }
-
-// Exportado à parte para permitir rodar manualmente (ex: endpoint de teste, ou script)
-export { verificarManutencoes, limparNotificacoesResolvidas }

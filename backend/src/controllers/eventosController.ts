@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import prisma from '../utils/prisma'
 import { AppError } from '../utils/AppError'
+import { textoCurto, textoLongo } from '../utils/validacao'
 import { gerarOcorrencias, intervaloDaRegra, FUSO_PADRAO_MINUTOS, LIMITE_OCORRENCIAS, RegraRecorrencia } from '../utils/recorrencia'
 
 const regraRecorrenciaSchema = z.object({
@@ -20,9 +21,9 @@ const regraRecorrenciaSchema = z.object({
 })
 
 const eventoSchema = z.object({
-  nome: z.string().min(2),
-  descricao: z.string().optional().nullable(),
-  local: z.string().optional().nullable(),
+  nome: textoCurto(2, 120),
+  descricao: textoLongo(500),
+  local: textoLongo(120),
   inicio: z.string().datetime({ message: 'Data/hora inválida. Use formato ISO 8601.' }),
   tipo: z.enum(['CULTO', 'REUNIAO', 'ESPECIAL']),
   recorrencia: z.enum(['NENHUMA', 'SEMANAL', 'MENSAL', 'PERSONALIZADA']).default('NENHUMA'),

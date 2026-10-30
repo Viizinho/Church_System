@@ -1,13 +1,13 @@
-import nodemailer from 'nodemailer'
+import nodemailer, { Transporter } from 'nodemailer'
 import axios from 'axios'
 
 // ─── E-mail ────────────────────────────────────────────────────────────────
 // Configuração via variáveis de ambiente (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS).
 // Em desenvolvimento sem SMTP configurado, apenas loga no console (não quebra o cron).
 
-let transporter: nodemailer.Transporter | null = null
+let transporter: Transporter | null = null
 
-function getTransporter(): nodemailer.Transporter | null {
+function getTransporter(): Transporter | null {
   if (!process.env.SMTP_HOST) return null
   if (!transporter) {
     transporter = nodemailer.createTransport({

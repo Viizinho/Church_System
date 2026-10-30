@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /login
+Disallow: /dashboard
+Disallow: /membros
+Disallow: /aniversarios
+Disallow: /eventos
+Disallow: /manutencao
+Disallow: /campanha
+Disallow: /mao-amiga
+Disallow: /api/

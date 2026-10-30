@@ -4,6 +4,10 @@ import bcrypt from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ Este seed cria dados de exemplo e a senha padrão admin123. Em produção use: npm run db:seed:admin')
+    process.exit(1)
+  }
   console.log('🌱 Iniciando seed...')
 
   // Usuário admin

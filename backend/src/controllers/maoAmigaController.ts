@@ -1,33 +1,35 @@
 import { Request, Response } from 'express'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import prisma from '../utils/prisma'
 import { AppError } from '../utils/AppError'
+import { enumQuery, textoCurto, textoLongo, urlHttp } from '../utils/validacao'
 
 const doacaoSchema = z.object({
   membroId: z.string().uuid().optional().nullable(),
-  nomeDoador: z.string().optional().nullable(),
-  data: z.string(),
-  itemDoado: z.string().min(2),
-  quantidade: z.string().min(1),
-  quantidadeNumerica: z.number().positive().optional().nullable(),
+  nomeDoador: textoLongo(120),
+  data: z.string().refine((d) => !Number.isNaN(Date.parse(d)), 'Data inválida.'),
+  itemDoado: textoCurto(2, 120),
+  quantidade: z.string().trim().min(1).max(60),
+  quantidadeNumerica: z.number().positive().max(100_000).optional().nullable(),
   metaCestaId: z.string().uuid().optional().nullable(),
   tipo: z.enum(['FISICA', 'PIX']),
-  comprovanteUrl: z.string().url().optional().nullable(),
+  comprovanteUrl: urlHttp.optional().nullable(),
 })
 
 const pixPublicoSchema = z.object({
-  nomeDoador: z.string().trim().min(2, 'Informe seu nome.'),
+  nomeDoador: textoCurto(2, 120),
   valor: z.number().positive('Valor deve ser positivo.').max(100000).optional().nullable(),
-  comprovanteUrl: z.string().url().optional().nullable(),
+  comprovanteUrl: urlHttp.optional().nullable(),
 })
 
 const doacaoPublicaSchema = z.object({
-  nomeDoador: z.string().trim().min(2, 'Informe seu nome.'),
+  nomeDoador: textoCurto(2, 120),
   itens: z
     .array(
       z.object({
         metaCestaId: z.string().uuid(),
-        quantidade: z.number().positive('Quantidade deve ser positiva.'),
+        quantidade: z.number().positive('Quantidade deve ser positiva.').max(10_000),
       })
     )
     .min(1, 'Escolha ao menos um item.')
@@ -35,13 +37,17 @@ const doacaoPublicaSchema = z.object({
 })
 
 const recusarSchema = z.object({
-  motivoRecusa: z.string().optional().nullable(),
+  motivoRecusa: textoLongo(300),
 })
 
+const STATUS = ['PENDENTE', 'CONFIRMADO', 'RECUSADO'] as const
+const TIPOS = ['FISICA', 'PIX'] as const
+const LIMITE_LISTAGEM = 500
+
 const metaCestaSchema = z.object({
-  nomeItem: z.string().min(2),
-  unidade: z.string().min(1).default('kg'),
-  quantidadeNecessaria: z.number().positive(),
+  nomeItem: textoCurto(2, 80),
+  unidade: textoCurto(1, 12).default('kg'),
+  quantidadeNecessaria: z.number().positive().max(1_000_000),
   ativo: z.boolean().default(true),
 })
 
@@ -53,13 +59,21 @@ async function calcularArrecadado(metaCestaId: string): Promise<number> {
   return Number(result._sum.quantidadeNumerica ?? 0)
 }
 
-/** Quantidade já prometida por doações que ainda aguardam confirmação. */
-async function calcularReservado(metaCestaId: string): Promise<number> {
-  const result = await prisma.doacaoAlimento.aggregate({
-    where: { metaCestaId, status: 'PENDENTE' },
+/** Totais confirmados e pendentes de todas as metas em UMA consulta. */
+export async function totaisPorMeta(metaIds: string[]) {
+  const confirmado = new Map<string, number>()
+  const pendente = new Map<string, number>()
+  if (metaIds.length === 0) return { confirmado, pendente }
+  const grupos = await prisma.doacaoAlimento.groupBy({
+    by: ['metaCestaId', 'status'],
+    where: { metaCestaId: { in: metaIds }, status: { in: ['CONFIRMADO', 'PENDENTE'] } },
     _sum: { quantidadeNumerica: true },
   })
-  return Number(result._sum.quantidadeNumerica ?? 0)
+  for (const g of grupos) {
+    if (!g.metaCestaId) continue
+    ;(g.status === 'CONFIRMADO' ? confirmado : pendente).set(g.metaCestaId, Number(g._sum.quantidadeNumerica ?? 0))
+  }
+  return { confirmado, pendente }
 }
 
 // ─── Metas da Cesta (necessidades a cobrir) ───────────────────────────────────
@@ -67,16 +81,14 @@ async function calcularReservado(metaCestaId: string): Promise<number> {
 export async function listarMetas(_req: Request, res: Response) {
   const metas = await prisma.metaCesta.findMany({ where: { ativo: true }, orderBy: { nomeItem: 'asc' } })
 
-  const comProgresso = await Promise.all(
-    metas.map(async (meta) => {
-      const arrecadado = await calcularArrecadado(meta.id)
-      const necessario = Number(meta.quantidadeNecessaria)
-      const restante = Math.max(necessario - arrecadado, 0)
+  const { confirmado } = await totaisPorMeta(metas.map((m) => m.id))
+  return res.json(
+    metas.map((meta) => {
+      const arrecadado = confirmado.get(meta.id) ?? 0
+      const restante = Math.max(Number(meta.quantidadeNecessaria) - arrecadado, 0)
       return { ...meta, arrecadado, restante, completo: restante <= 0 }
     })
   )
-
-  return res.json(comProgresso)
 }
 
 export async function criarMeta(req: Request, res: Response) {
@@ -107,18 +119,22 @@ export async function removerMeta(req: Request, res: Response) {
 // ─── Doações ───────────────────────────────────────────────────────────────
 
 export async function listar(req: Request, res: Response) {
-  const { status, tipo } = req.query
+  if (req.query.status && !enumQuery(req.query.status, STATUS)) throw new AppError('Status inválido.')
+  if (req.query.tipo && !enumQuery(req.query.tipo, TIPOS)) throw new AppError('Tipo inválido.')
+  const status = enumQuery(req.query.status, STATUS)
+  const tipo = enumQuery(req.query.tipo, TIPOS)
 
   const doacoes = await prisma.doacaoAlimento.findMany({
     where: {
-      ...(status ? { status: status as 'PENDENTE' | 'CONFIRMADO' | 'RECUSADO' } : {}),
-      ...(tipo ? { tipo: tipo as 'FISICA' | 'PIX' } : {}),
+      ...(status ? { status } : {}),
+      ...(tipo ? { tipo } : {}),
     },
     include: {
       membro: { select: { id: true, nomeCompleto: true } },
       metaCesta: { select: { id: true, nomeItem: true } },
     },
-    orderBy: { data: 'desc' },
+    orderBy: [{ data: 'desc' }, { criadoEm: 'desc' }],
+    take: LIMITE_LISTAGEM,
   })
 
   return res.json(doacoes)
@@ -129,6 +145,7 @@ export async function listarPendentes(_req: Request, res: Response) {
     where: { status: 'PENDENTE' },
     include: { membro: { select: { id: true, nomeCompleto: true } } },
     orderBy: { criadoEm: 'asc' },
+    take: LIMITE_LISTAGEM,
   })
   return res.json(pendentes)
 }
@@ -201,37 +218,49 @@ export async function registrarDoacaoPublica(req: Request, res: Response) {
   const ids = dados.itens.map((i) => i.metaCestaId)
   if (new Set(ids).size !== ids.length) throw new AppError('Item repetido na doação.')
 
-  const criar: Parameters<typeof prisma.doacaoAlimento.create>[0][] = []
+  // Serializable: duas pessoas doando o último item ao mesmo tempo não ultrapassam a meta
+  // (a segunda transação falha com P2034 e o handler responde 409 "tente novamente").
+  const doacoes = await prisma.$transaction(
+    async (tx) => {
+      const criadas = []
+      for (const item of dados.itens) {
+        const meta = await tx.metaCesta.findUnique({ where: { id: item.metaCestaId } })
+        if (!meta || !meta.ativo) throw new AppError('Item da cesta não encontrado.', 404)
 
-  for (const item of dados.itens) {
-    const meta = await prisma.metaCesta.findUnique({ where: { id: item.metaCestaId } })
-    if (!meta || !meta.ativo) throw new AppError('Item da cesta não encontrado.', 404)
+        const soma = await tx.doacaoAlimento.groupBy({
+          by: ['status'],
+          where: { metaCestaId: meta.id, status: { in: ['CONFIRMADO', 'PENDENTE'] } },
+          _sum: { quantidadeNumerica: true },
+        })
+        const usado = soma.reduce((acc, g) => acc + Number(g._sum.quantidadeNumerica ?? 0), 0)
+        const disponivel = Number(meta.quantidadeNecessaria) - usado
 
-    const [arrecadado, reservado] = await Promise.all([calcularArrecadado(meta.id), calcularReservado(meta.id)])
-    const disponivel = Number(meta.quantidadeNecessaria) - arrecadado - reservado
+        if (disponivel <= 0) {
+          throw new AppError(`A meta de "${meta.nomeItem}" já foi atingida. Escolha outro item.`)
+        }
+        if (item.quantidade > disponivel) {
+          throw new AppError(`Só faltam ${disponivel} ${meta.unidade} de "${meta.nomeItem}". Ajuste a quantidade.`)
+        }
 
-    if (disponivel <= 0) {
-      throw new AppError(`A meta de "${meta.nomeItem}" já foi atingida. Escolha outro item.`)
-    }
-    if (item.quantidade > disponivel) {
-      throw new AppError(`Só faltam ${disponivel} ${meta.unidade} de "${meta.nomeItem}". Ajuste a quantidade.`)
-    }
-
-    criar.push({
-      data: {
-        nomeDoador: dados.nomeDoador,
-        data: new Date(),
-        itemDoado: meta.nomeItem,
-        quantidade: `${item.quantidade} ${meta.unidade}`,
-        quantidadeNumerica: item.quantidade,
-        metaCestaId: meta.id,
-        tipo: 'FISICA',
-        status: 'PENDENTE',
-      },
-    })
-  }
-
-  const doacoes = await prisma.$transaction(criar.map((c) => prisma.doacaoAlimento.create(c)))
+        criadas.push(
+          await tx.doacaoAlimento.create({
+            data: {
+              nomeDoador: dados.nomeDoador,
+              data: new Date(),
+              itemDoado: meta.nomeItem,
+              quantidade: `${item.quantidade} ${meta.unidade}`,
+              quantidadeNumerica: item.quantidade,
+              metaCestaId: meta.id,
+              tipo: 'FISICA',
+              status: 'PENDENTE',
+            },
+          })
+        )
+      }
+      return criadas
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+  )
   return res.status(201).json(doacoes)
 }
 
@@ -239,13 +268,13 @@ export async function confirmar(req: Request, res: Response) {
   const { id } = req.params
   const doacao = await prisma.doacaoAlimento.findUnique({ where: { id } })
   if (!doacao) throw new AppError('Doação não encontrada.', 404)
-  if (doacao.status !== 'PENDENTE') throw new AppError('Doação já processada.')
 
-  const atualizada = await prisma.doacaoAlimento.update({
-    where: { id },
+  const { count } = await prisma.doacaoAlimento.updateMany({
+    where: { id, status: 'PENDENTE' },
     data: { status: 'CONFIRMADO', confirmadoPor: req.usuarioId, confirmadoEm: new Date() },
   })
-  return res.json(atualizada)
+  if (count === 0) throw new AppError('Doação já processada.', 409)
+  return res.json(await prisma.doacaoAlimento.findUniqueOrThrow({ where: { id } }))
 }
 
 export async function recusar(req: Request, res: Response) {
@@ -253,16 +282,11 @@ export async function recusar(req: Request, res: Response) {
   const { motivoRecusa } = recusarSchema.parse(req.body ?? {})
   const doacao = await prisma.doacaoAlimento.findUnique({ where: { id } })
   if (!doacao) throw new AppError('Doação não encontrada.', 404)
-  if (doacao.status !== 'PENDENTE') throw new AppError('Doação já processada.')
 
-  const atualizada = await prisma.doacaoAlimento.update({
-    where: { id },
-    data: {
-      status: 'RECUSADO',
-      motivoRecusa: motivoRecusa ?? null,
-      confirmadoPor: req.usuarioId,
-      confirmadoEm: new Date(),
-    },
+  const { count } = await prisma.doacaoAlimento.updateMany({
+    where: { id, status: 'PENDENTE' },
+    data: { status: 'RECUSADO', motivoRecusa, confirmadoPor: req.usuarioId, confirmadoEm: new Date() },
   })
-  return res.json(atualizada)
+  if (count === 0) throw new AppError('Doação já processada.', 409)
+  return res.json(await prisma.doacaoAlimento.findUniqueOrThrow({ where: { id } }))
 }

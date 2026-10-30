@@ -8,6 +8,7 @@ import Input from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Spinner from '@/components/ui/Spinner'
+import PageHeader from '@/components/ui/PageHeader'
 import dayjs from 'dayjs'
 
 interface MetaCesta {
@@ -133,14 +134,12 @@ export default function MaoAmigaAdminPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Projeto Mão Amiga</h1>
-          <p className="text-sm text-gray-500">Doações de alimentos</p>
-        </div>
-        <Button onClick={() => { setForm({ membroId: '', nomeDoador: '', data: dayjs().format('YYYY-MM-DD'), itemDoado: '', quantidade: '', tipo: 'FISICA', metaCestaId: '', quantidadeNumerica: '' }); setModal(true) }}>+ Registrar doação</Button>
-      </div>
+    <div className="p-4 sm:p-6 max-w-5xl">
+      <PageHeader
+        title="Projeto Mão Amiga"
+        subtitle="Doações de alimentos"
+        actions={<Button onClick={() => { setForm({ membroId: '', nomeDoador: '', data: dayjs().format('YYYY-MM-DD'), itemDoado: '', quantidade: '', tipo: 'FISICA', metaCestaId: '', quantidadeNumerica: '' }); setModal(true) }}>+ Registrar doação</Button>}
+      />
 
       {erro && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}
 

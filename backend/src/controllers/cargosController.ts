@@ -2,10 +2,11 @@ import { Request, Response } from 'express'
 import { z } from 'zod'
 import prisma from '../utils/prisma'
 import { AppError } from '../utils/AppError'
+import { textoCurto, textoLongo } from '../utils/validacao'
 
 const cargoSchema = z.object({
-  nome: z.string().min(2),
-  descricao: z.string().optional().nullable(),
+  nome: textoCurto(2, 60),
+  descricao: textoLongo(200),
 })
 
 export async function listar(_req: Request, res: Response) {

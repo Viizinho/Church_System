@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { autenticar } from '../middlewares/autenticar'
+import { limiteEnvioPublico, limiteLeituraPublica, limiteLogin } from '../middlewares/rateLimit'
 
 import * as auth from '../controllers/authController'
 import * as membros from '../controllers/membrosController'
@@ -14,8 +15,9 @@ import * as publico from '../controllers/publicoController'
 const router = Router()
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-router.post('/auth/login', auth.login)
+router.post('/auth/login', limiteLogin, auth.login)
 router.get('/auth/perfil', autenticar, auth.perfil)
+router.put('/auth/senha', autenticar, limiteLogin, auth.alterarSenha)
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 router.get('/dashboard', autenticar, dashboard.resumo)
@@ -69,9 +71,9 @@ router.get('/campanha/contribuicoes/pendentes', autenticar, campanha.listarPende
 router.patch('/campanha/contribuicoes/:id/confirmar', autenticar, campanha.confirmarContribuicao)
 router.patch('/campanha/contribuicoes/:id/recusar', autenticar, campanha.recusarContribuicao)
 // Público
-router.get('/publico/campanha', campanha.listarItens)
+router.get('/publico/campanha', limiteLeituraPublica, campanha.listarItens)
 router.get('/publico/campanha/eventos', campanha.eventosCampanha) // SSE — total ao vivo
-router.post('/publico/campanha/:itemId/contribuir', campanha.criarContribuicao)
+router.post('/publico/campanha/:itemId/contribuir', limiteEnvioPublico, campanha.criarContribuicao)
 
 // ─── Projeto Mão Amiga ────────────────────────────────────────────────────────
 // Admin
@@ -85,13 +87,13 @@ router.post('/mao-amiga/metas', autenticar, maoAmiga.criarMeta)
 router.put('/mao-amiga/metas/:id', autenticar, maoAmiga.atualizarMeta)
 router.delete('/mao-amiga/metas/:id', autenticar, maoAmiga.removerMeta)
 // Público
-router.post('/publico/mao-amiga/pix', maoAmiga.registrarPixPublico)
-router.post('/publico/mao-amiga/doacoes', maoAmiga.registrarDoacaoPublica)
-router.get('/publico/mao-amiga/metas', publico.metasMaoAmigaPublicas)
+router.post('/publico/mao-amiga/pix', limiteEnvioPublico, maoAmiga.registrarPixPublico)
+router.post('/publico/mao-amiga/doacoes', limiteEnvioPublico, maoAmiga.registrarDoacaoPublica)
+router.get('/publico/mao-amiga/metas', limiteLeituraPublica, publico.metasMaoAmigaPublicas)
 
 // ─── Área Pública (Landing Page) ───────────────────────────────────────────────
-router.get('/publico/config', publico.configuracao)
+router.get('/publico/config', limiteLeituraPublica, publico.configuracao)
 router.put('/publico/config', autenticar, publico.atualizarConfiguracao)
-router.get('/publico/eventos', publico.eventosPublicos)
+router.get('/publico/eventos', limiteLeituraPublica, publico.eventosPublicos)
 
 export default router

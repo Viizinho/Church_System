@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { AppError } from '../utils/AppError'
+import { env } from '../config/env'
 
 interface JwtPayload {
   sub: string
@@ -22,9 +23,10 @@ export function autenticar(req: Request, _res: Response, next: NextFunction) {
     throw new AppError('Token de autenticação não fornecido.', 401)
   }
 
-  const token = authHeader.split(' ')[1]
+  const token = authHeader.slice(7)
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload
+    // Fixa o algoritmo: evita aceitar tokens "alg: none" ou trocados por outro algoritmo.
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as JwtPayload
     req.usuarioId = decoded.sub
     req.usuarioNome = decoded.nome
     next()

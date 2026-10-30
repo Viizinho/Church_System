@@ -1,0 +1,32 @@
+# Sobe tudo localmente (banco + aplicação):  docker compose up --build
+# Depois crie o administrador:
+#   docker compose run --rm app sh -c "ADMIN_EMAIL=voce@igreja.org ADMIN_PASSWORD='SenhaForte123' npx --prefix backend tsx backend/prisma/seed-admin.ts"
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: igreja
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD}
+      POSTGRES_DB: igreja_db
+    volumes:
+      - dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U igreja -d igreja_db"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3333:3333"
+    environment:
+      DATABASE_URL: postgresql://igreja:${DB_PASSWORD}@db:5432/igreja_db
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET (openssl rand -hex 48)}
+      NODE_ENV: production
+      TRUST_PROXY: "1"
+
+volumes:
+  dados:

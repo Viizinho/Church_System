@@ -9,6 +9,7 @@ import Select from '@/components/ui/Select'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Spinner from '@/components/ui/Spinner'
+import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
 import { formatarData, paraInputData } from '@/utils/data'
 
@@ -107,16 +108,12 @@ export default function RelatorioManutencoesPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Relatório de manutenções</h1>
-          <p className="text-sm text-gray-500">Todas as manutenções realizadas, agrupadas por ativo</p>
-        </div>
-        <Link to="/manutencao">
-          <Button variant="secondary">← Voltar aos ativos</Button>
-        </Link>
-      </div>
+    <div className="p-4 sm:p-6 max-w-5xl">
+      <PageHeader
+        title="Relatório de manutenções"
+        subtitle="Todas as manutenções realizadas, agrupadas por ativo"
+        actions={<Link to="/manutencao"><Button variant="secondary">← Voltar aos ativos</Button></Link>}
+      />
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
         <Select label="Ativo" value={filtroAtivo} onChange={(e) => setFiltroAtivo(e.target.value)}>

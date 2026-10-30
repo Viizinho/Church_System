@@ -3,18 +3,23 @@ import { z } from 'zod'
 import prisma from '../utils/prisma'
 import { AppError } from '../utils/AppError'
 import { diasAteAniversario, proximoAniversario } from '../utils/aniversario'
+import { enumQuery, telefone, textoCurto, textoLongo, urlHttp } from '../utils/validacao'
 
 const membroSchema = z.object({
-  nomeCompleto: z.string().min(2, 'Nome deve ter ao menos 2 caracteres.'),
-  dataNascimento: z.string().optional().nullable(),
-  telefone: z.string().optional().nullable(),
-  email: z.string().email('E-mail inválido.').optional().nullable(),
-  endereco: z.string().optional().nullable(),
-  fotoUrl: z.string().url('URL inválida.').optional().nullable(),
+  nomeCompleto: textoCurto(2, 150),
+  dataNascimento: z
+    .string()
+    .refine((d) => !Number.isNaN(Date.parse(d)), 'Data de nascimento inválida.')
+    .optional()
+    .nullable(),
+  telefone: telefone.optional().nullable(),
+  email: z.string().trim().email('E-mail inválido.').max(254).optional().nullable(),
+  endereco: textoLongo(250),
+  fotoUrl: urlHttp.optional().nullable(),
   status: z.enum(['ATIVO', 'INATIVO']).default('ATIVO'),
-  cargoIds: z.array(z.string().uuid()).optional(),
-  categoriaIds: z.array(z.string().uuid()).optional(),
-  conjuntoIds: z.array(z.string().uuid()).optional(),
+  cargoIds: z.array(z.string().uuid()).max(50).optional(),
+  categoriaIds: z.array(z.string().uuid()).max(50).optional(),
+  conjuntoIds: z.array(z.string().uuid()).max(50).optional(),
   naoQuerImagemGravada: z.boolean().optional(),
 })
 
@@ -28,7 +33,8 @@ function listaParam(valor: unknown): string[] {
 }
 
 export async function listar(req: Request, res: Response) {
-  const { busca, status } = req.query
+  const busca = typeof req.query.busca === 'string' ? req.query.busca.trim().slice(0, 100) : ''
+  const status = enumQuery(req.query.status, ['ATIVO', 'INATIVO'] as const)
   // Filtros múltiplos: dentro de cada grupo vale "qualquer um dos marcados";
   // entre grupos (cargo, categoria, conjunto, status, busca) vale "e".
   // cargoId/categoriaId (singular) continuam aceitos por compatibilidade.
@@ -38,16 +44,16 @@ export async function listar(req: Request, res: Response) {
 
   const membros = await prisma.membro.findMany({
     where: {
-      ...(status ? { status: status as 'ATIVO' | 'INATIVO' } : {}),
+      ...(status ? { status } : {}),
       ...(cargoIds.length ? { cargos: { some: { cargoId: { in: cargoIds } } } } : {}),
       ...(categoriaIds.length ? { categorias: { some: { categoriaId: { in: categoriaIds } } } } : {}),
       ...(conjuntoIds.length ? { conjuntos: { some: { conjuntoId: { in: conjuntoIds } } } } : {}),
       ...(busca
         ? {
             OR: [
-              { nomeCompleto: { contains: String(busca), mode: 'insensitive' } },
-              { email: { contains: String(busca), mode: 'insensitive' } },
-              { telefone: { contains: String(busca), mode: 'insensitive' } },
+              { nomeCompleto: { contains: busca, mode: 'insensitive' } },
+              { email: { contains: busca, mode: 'insensitive' } },
+              { telefone: { contains: busca, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -58,6 +64,7 @@ export async function listar(req: Request, res: Response) {
       conjuntos: { include: { conjunto: { select: { id: true, nome: true } } } },
     },
     orderBy: { nomeCompleto: 'asc' },
+    take: 2000,
   })
 
   return res.json(membros)

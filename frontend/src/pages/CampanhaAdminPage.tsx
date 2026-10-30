@@ -8,8 +8,10 @@ import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Card, { CardBody } from '@/components/ui/Card'
 import Spinner from '@/components/ui/Spinner'
+import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
 import dayjs from 'dayjs'
+import { formatarMoeda } from '@/utils/data'
 
 export default function CampanhaAdminPage() {
   const [itens, setItens] = useState<ItemCampanha[]>([])
@@ -108,14 +110,13 @@ export default function CampanhaAdminPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Campanha Jardim Cidade Universitária</h1>
-          <p className="text-sm text-gray-500">Gerencie itens e confirme contribuições</p>
-        </div>
-        <Button onClick={openCreate}>+ Novo item</Button>
-      </div>
+    <div className="p-4 sm:p-6 max-w-5xl">
+      <PageHeader
+        title="Campanha"
+        tabTitle="Campanha"
+        subtitle="Jardim Cidade Universitária — gerencie itens e confirme contribuições"
+        actions={<Button onClick={openCreate}>+ Novo item</Button>}
+      />
 
       {erro && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}
 
@@ -157,7 +158,7 @@ export default function CampanhaAdminPage() {
                 <div className="flex-1 min-w-[200px]">
                   <p className="text-sm font-medium text-gray-900">{c.nomeContribuidor} — {c.item?.nome}</p>
                   <p className="text-xs text-gray-500">
-                    R$ {Number(c.valor).toFixed(2)} · enviada em {dayjs(c.criadoEm).format('DD/MM/YYYY HH:mm')}
+                    {formatarMoeda(c.valor)} · enviada em {dayjs(c.criadoEm).format('DD/MM/YYYY HH:mm')}
                     {c.confirmadoEm && ` · analisada em ${dayjs(c.confirmadoEm).format('DD/MM/YYYY HH:mm')}`}
                   </p>
                   {c.status === 'RECUSADO' && c.motivoRecusa && (
@@ -195,8 +196,8 @@ export default function CampanhaAdminPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                    <span className="font-medium text-gray-900">R$ {Number(item.valorArrecadado).toFixed(2)}</span>
-                    <span>de R$ {Number(item.valorTotal).toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">{formatarMoeda(item.valorArrecadado)}</span>
+                    <span>de {formatarMoeda(item.valorTotal)}</span>
                     <span>({pct.toFixed(0)}%)</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
@@ -236,7 +237,7 @@ export default function CampanhaAdminPage() {
         onCancel={() => setAprovando(null)}
       >
         <p>
-          Confirmar o recebimento de <strong>R$ {Number(aprovando?.valor ?? 0).toFixed(2)}</strong> de{' '}
+          Confirmar o recebimento de <strong>{formatarMoeda(aprovando?.valor)}</strong> de{' '}
           <strong>{aprovando?.nomeContribuidor}</strong> para <strong>{aprovando?.item?.nome}</strong>?
         </p>
         <p className="text-xs text-gray-500">
@@ -253,7 +254,7 @@ export default function CampanhaAdminPage() {
         onCancel={() => setRecusando(null)}
       >
         <p>
-          Recusar a contribuição de <strong>R$ {Number(recusando?.valor ?? 0).toFixed(2)}</strong> de{' '}
+          Recusar a contribuição de <strong>{formatarMoeda(recusando?.valor)}</strong> de{' '}
           <strong>{recusando?.nomeContribuidor}</strong>? Ela não será contabilizada.
         </p>
         <Input label="Motivo (opcional)" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: Pix não localizado" />

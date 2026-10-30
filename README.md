@@ -60,36 +60,42 @@ igreja-gestao/
     └── ISSUE_TEMPLATE/
 ```
 
-## Instalação
-
-Consulte o [CONTRIBUTING.md](./CONTRIBUTING.md) para instruções detalhadas de setup do ambiente.
-
-**Resumo rápido:**
+## Instalação (desenvolvimento)
 
 ```bash
-# Backend
-cd backend && npm install
-cp .env.example .env        # configure DATABASE_URL e JWT_SECRET
-npm run db:migrate && npm run db:seed
-npm run dev
+npm install                      # na raiz — instala backend e frontend (npm workspaces)
+cd backend
+cp .env.example .env             # configure DATABASE_URL e JWT_SECRET
+npx prisma generate
+npm run db:migrate
+npm run db:seed                  # admin de teste + dados básicos (só desenvolvimento)
+npm run dev                      # API em :3333
 
-# Frontend (outro terminal)
-cd frontend && npm install
-cp .env.example .env
-npm run dev
+cd ../frontend && cp .env.example .env && npm run dev   # outro terminal — http://localhost:5173
 ```
 
-Acesse `http://localhost:5173` com `admin@igreja.com` / `admin123`.
+Login de desenvolvimento: `admin@igreja.com` / `admin123`. Para uma apresentação com dados de exemplo completos: `npm run db:seed:demo` (ver [DEMO.md](./DEMO.md)).
 
-## Rotas da API
+## Qualidade
 
-Documentação completa no [backend/README.md](./backend/README.md).
+```bash
+npm run typecheck     # TypeScript (backend + frontend)
+npm test              # testes da API, recorrência de eventos, aniversários e modo produção (sem precisar de banco)
+npm run audit:prod    # vulnerabilidades conhecidas nas dependências de produção
+```
 
-As rotas públicas (sem autenticação) são:
-- `POST /api/publico/campanha/:itemId/contribuir`
-- `POST /api/publico/mao-amiga/pix`
+O relatório da última revisão (segurança, desempenho, código morto) está em [docs/DIAGNOSTICO.md](./docs/DIAGNOSTICO.md).
 
-Todas as demais exigem o header `Authorization: Bearer <token>`.
+## Publicar na internet
+
+A API serve o frontend compilado, então é **um serviço só** (sem CORS) + um PostgreSQL.
+
+1. **Variáveis** (veja `backend/.env.example`): `DATABASE_URL`, `JWT_SECRET` (`openssl rand -hex 48`), `NODE_ENV=production`, `TRUST_PROXY=1` (Render/Railway/Nginx). O servidor **se recusa a subir** com segredo fraco.
+2. **Build e migração:** `npm ci && npm run build --workspace=frontend && npm run build --workspace=backend` e, no deploy, `npm run db:deploy --workspace=backend` (aplica migrações sem apagar dados).
+3. **Administrador (produção):** `ADMIN_EMAIL=... ADMIN_PASSWORD='...' npm run db:seed:admin --workspace=backend`. Os seeds de exemplo (`db:seed`, `db:seed:demo`) **recusam rodar** com `NODE_ENV=production`.
+4. **Iniciar:** `npm start` (ou use o `Dockerfile` / `docker-compose.yml` da raiz). Health checks: `/health` e `/ready` (confere o banco).
+5. **HTTPS** é responsabilidade do provedor/proxy. Após publicar, entre e troque a senha em *Alterar senha*.
+6. **Backup:** habilite backup automático do PostgreSQL no provedor (os dados de membros são pessoais — LGPD).
 
 ## Licença
 

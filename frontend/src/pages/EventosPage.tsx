@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, MapPin, Repeat, Search } from 'lucide-react'
 import api from '@/services/api'
 import type { Evento, RegraRecorrencia, TipoEvento } from '@/types'
 import Button from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
 import Badge from '@/components/ui/Badge'
 import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
@@ -254,13 +255,7 @@ export default function EventosPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Eventos</h1>
-          <p className="text-sm text-gray-500">Agenda da igreja, com cultos e reuniões que se repetem</p>
-        </div>
-        <Button onClick={openCreate}>+ Novo evento</Button>
-      </div>
+      <PageHeader title="Eventos" subtitle="Agenda da igreja, com cultos e reuniões que se repetem" actions={<Button onClick={openCreate}>+ Novo evento</Button>} />
 
       {/* Navegação de mês + filtros */}
       <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 flex flex-wrap items-center gap-3">

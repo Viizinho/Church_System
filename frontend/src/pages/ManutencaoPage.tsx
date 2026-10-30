@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ClipboardList } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import api from '@/services/api'
 import type { Ativo, Manutencao } from '@/types'
@@ -7,6 +8,7 @@ import Badge from '@/components/ui/Badge'
 import Input from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
 import Spinner from '@/components/ui/Spinner'
+import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
 import dayjs from 'dayjs'
 import { formatarData } from '@/utils/data'
@@ -79,21 +81,19 @@ export default function ManutencaoPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Manutenção</h1>
-          <p className="text-sm text-gray-500">Controle de ativos da igreja</p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/manutencao/relatorio"><Button variant="secondary">📋 Relatório por ativo</Button></Link>
+    <div className="p-4 sm:p-6 max-w-6xl">
+      <PageHeader
+        title="Manutenção"
+        subtitle="Controle de ativos da igreja"
+        actions={<>
+          <Link to="/manutencao/relatorio"><Button variant="secondary"><ClipboardList size={15} aria-hidden /> Relatório por ativo</Button></Link>
           <Button onClick={openCreateAtivo}>+ Novo ativo</Button>
-        </div>
-      </div>
+        </>}
+      />
 
       {loading ? <Spinner /> : ativos.length === 0 ? <EmptyState message="Nenhum ativo cadastrado" icon="🔧" /> : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>{['Ativo','Periodicidade','Última manutenção','Próxima','Status',''].map((h) => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500">{h}</th>

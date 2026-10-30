@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import Input from '@/components/ui/Input'
 import Spinner from '@/components/ui/Spinner'
+import { formatarMoeda } from '@/utils/data'
 
 const valoresSugeridos = [50, 100, 250, 500]
 
@@ -103,8 +104,8 @@ export default function CampanhaPublicaPage({ embedded = false }: Props) {
                 <p className="font-semibold text-gray-900 mb-1">{item.nome}</p>
                 {item.descricao && <p className="text-xs text-gray-500 mb-3">{item.descricao}</p>}
                 <div className="flex items-center gap-1 text-sm mb-2">
-                  <span className="font-semibold text-gray-900">R$ {Number(item.valorArrecadado).toFixed(2)}</span>
-                  <span className="text-gray-400">de R$ {Number(item.valorTotal).toFixed(2)}</span>
+                  <span className="font-semibold text-gray-900">{formatarMoeda(item.valorArrecadado)}</span>
+                  <span className="text-gray-400">de {formatarMoeda(item.valorTotal)}</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
                   <div className={`h-2 rounded-full ${done ? 'bg-green-500' : 'bg-primary-500'}`} style={{ width: `${pct}%` }} />
@@ -133,7 +134,7 @@ export default function CampanhaPublicaPage({ embedded = false }: Props) {
                 ))}
                 <button type="button" onClick={() => { setValor(null) }}
                   className={`col-span-2 py-2.5 rounded-lg text-sm border transition-colors ${!valor && !valorCustom ? 'border-gray-300' : valor === null ? 'bg-primary-500 text-white border-primary-500' : 'border-gray-300 text-gray-700 hover:border-primary-400'}`}>
-                  Valor inteiro — R$ {Number(selected?.valorTotal ?? 0).toFixed(2)}
+                  Valor inteiro — {formatarMoeda(selected?.valorTotal)}
                 </button>
               </div>
               <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 h-10">

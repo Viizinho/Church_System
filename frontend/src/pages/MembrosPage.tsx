@@ -3,6 +3,7 @@ import { CameraOff, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import api from '@/services/api'
 import type { Membro, Cargo, Categoria, ConjuntoMusical } from '@/types'
 import Button from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
 import Badge from '@/components/ui/Badge'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import MultiSelectFilter from '@/components/ui/MultiSelectFilter'
@@ -166,19 +167,19 @@ export default function MembrosPage() {
   )
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Membros</h1>
-          <p className="text-sm text-gray-500" aria-live="polite">
+    <div className="p-4 sm:p-6 max-w-6xl">
+      <PageHeader
+        title="Membros"
+        subtitle={
+          <span aria-live="polite">
             {primeiraCarga
               ? 'Carregando…'
               : `${membros.length} ${filtrando ? (membros.length === 1 ? 'resultado' : 'resultados') : membros.length === 1 ? 'cadastrado' : 'cadastrados'}`}
             {!primeiraCarga && membros.length > 0 && ` — ${ativos} ativo${ativos !== 1 ? 's' : ''}, ${membros.length - ativos} inativo${membros.length - ativos !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <Button onClick={abrirNovo}><Plus size={16} aria-hidden /> Novo membro</Button>
-      </div>
+          </span>
+        }
+        actions={<Button onClick={abrirNovo}><Plus size={16} aria-hidden /> Novo membro</Button>}
+      />
 
       {/* Filtros */}
       <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 mb-4 space-y-3">

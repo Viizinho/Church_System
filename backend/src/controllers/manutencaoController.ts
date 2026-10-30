@@ -2,18 +2,19 @@ import { Request, Response } from 'express'
 import { z } from 'zod'
 import prisma from '../utils/prisma'
 import { AppError } from '../utils/AppError'
+import { textoCurto, textoLongo } from '../utils/validacao'
 import { calcularProximaManutencao, calcularStatus } from '../utils/manutencao'
 
 const ativoSchema = z.object({
-  nome: z.string().min(2),
-  descricao: z.string().optional().nullable(),
-  periodicidadeDias: z.number().int().positive('Periodicidade deve ser positiva.'),
+  nome: textoCurto(2, 120),
+  descricao: textoLongo(500),
+  periodicidadeDias: z.number().int().positive('Periodicidade deve ser positiva.').max(3650),
 })
 
 const manutencaoSchema = z.object({
-  data: z.string(),
-  descricao: z.string().min(2),
-  responsavel: z.string().min(2),
+  data: z.string().refine((d) => !Number.isNaN(Date.parse(d)), 'Data inválida.'),
+  descricao: textoCurto(2, 300),
+  responsavel: textoCurto(2, 120),
 })
 
 async function enriquecerAtivo(ativoId: string) {

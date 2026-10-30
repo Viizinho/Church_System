@@ -20,3 +20,8 @@ export function formatarDiaMes(iso?: string | null): string {
   if (!iso) return '—'
   return dayjs(iso.slice(0, 10)).format('DD/MM')
 }
+
+/** "R$ 1.650,00" */
+export function formatarMoeda(valor: number | string | null | undefined): string {
+  return Number(valor ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
