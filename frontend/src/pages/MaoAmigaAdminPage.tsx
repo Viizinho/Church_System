@@ -134,7 +134,7 @@ export default function MaoAmigaAdminPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl">
+    <div className="p-4 sm:p-6 2xl:px-10">
       <PageHeader
         title="Projeto Mão Amiga"
         subtitle="Doações de alimentos"

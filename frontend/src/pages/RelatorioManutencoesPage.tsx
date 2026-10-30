@@ -108,7 +108,7 @@ export default function RelatorioManutencoesPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl">
+    <div className="p-4 sm:p-6 2xl:px-10">
       <PageHeader
         title="Relatório de manutenções"
         subtitle="Todas as manutenções realizadas, agrupadas por ativo"

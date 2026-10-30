@@ -110,7 +110,7 @@ export default function CampanhaAdminPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl">
+    <div className="p-4 sm:p-6 2xl:px-10">
       <PageHeader
         title="Campanha"
         tabTitle="Campanha"
