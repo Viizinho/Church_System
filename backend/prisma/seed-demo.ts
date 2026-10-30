@@ -221,11 +221,6 @@ async function main() {
     serie(nome, descricao, local, tipo, semanas(inicio, repeticoes, intervalo), RecorrenciaEvento.SEMANAL, {
       diasSemana: [inicio.getDay()], intervalo, criterioParada: { tipo: 'OCORRENCIAS', valor: repeticoes },
     })
-  const mensal = (nome: string, descricao: string, local: string, tipo: TipoEvento, inicio: Date, repeticoes: number) =>
-    serie(nome, descricao, local, tipo,
-      Array.from({ length: repeticoes }, (_, i) => new Date(inicio.getFullYear(), inicio.getMonth() + i, inicio.getDate(), inicio.getHours(), inicio.getMinutes())),
-      RecorrenciaEvento.MENSAL, { intervalo: 1, criterioParada: { tipo: 'OCORRENCIAS', valor: repeticoes } })
-
   await semanal('Escola Bíblica Dominical', 'Classes para todas as idades', 'Salas de aula', TipoEvento.REUNIAO, proximoDiaSemana(0, 9), 8)
   await semanal('Culto de celebração', 'Culto da família', 'Templo principal', TipoEvento.CULTO, proximoDiaSemana(0, 18, 30), 8)
   await semanal('Culto de oração', 'Momento de intercessão', 'Templo principal', TipoEvento.CULTO, proximoDiaSemana(3, 19, 30), 8)
@@ -235,7 +230,28 @@ async function main() {
     [2, 4].flatMap((dow) => semanas(proximoDiaSemana(dow, 20), 4)).sort((a, b) => a.getTime() - b.getTime()),
     RecorrenciaEvento.SEMANAL, { diasSemana: [2, 4], intervalo: 1, criterioParada: { tipo: 'OCORRENCIAS', valor: 8 } })
   await semanal('Reunião de líderes (quinzenal)', 'Alinhamento entre os ministérios', 'Sala de reuniões', TipoEvento.REUNIAO, proximoDiaSemana(6, 16), 5, 2)
-  await mensal('Santa Ceia', 'Celebração mensal da Santa Ceia', 'Templo principal', TipoEvento.CULTO, quando(12, 18, 30), 4)
+  // "Primeira terça do mês" / "primeiro domingo do mês" (regra por dia da semana)
+  const enesimoDia = (ano: number, mes: number, dow: number, nth: number, h: number, m = 0) => {
+    const primeiro = new Date(ano, mes, 1).getDay()
+    return new Date(ano, mes, 1 + ((dow - primeiro + 7) % 7) + (nth - 1) * 7, h, m)
+  }
+  const mensalNoDiaDaSemana = async (nome: string, descricao: string, local: string, tipo: TipoEvento, dow: number, nth: number, h: number, m: number, meses: number) => {
+    const datas: Date[] = []
+    for (let k = 0; datas.length < meses && k < 24; k++) {
+      const d = enesimoDia(hoje0.getFullYear(), hoje0.getMonth() + k, dow, nth, h, m)
+      if (d >= agora) datas.push(d)
+    }
+    await serie(nome, descricao, local, tipo, datas, RecorrenciaEvento.MENSAL, {
+      mensalPor: 'DIA_DA_SEMANA', semanaDoMes: nth, diaSemanaMes: dow, intervalo: 1,
+      criterioParada: { tipo: 'OCORRENCIAS', valor: meses },
+    })
+  }
+  await mensalNoDiaDaSemana('Santa Ceia', 'Celebração da Santa Ceia', 'Templo principal', TipoEvento.CULTO, 2, 1, 19, 30, 4) // 1ª terça
+  await mensalNoDiaDaSemana('Culto de jovens', 'Culto da mocidade', 'Templo principal', TipoEvento.CULTO, 0, 1, 18, 30, 4) // 1º domingo
+  // A cada 15 dias
+  await serie('Mutirão de limpeza', 'Cuidado com o espaço da igreja', 'Salão da igreja', TipoEvento.REUNIAO,
+    Array.from({ length: 4 }, (_, i) => quando(3 + i * 15, 8)), RecorrenciaEvento.PERSONALIZADA,
+    { unidade: 'DIAS', intervalo: 15, criterioParada: { tipo: 'OCORRENCIAS', valor: 4 } })
 
   await prisma.evento.createMany({
     data: [

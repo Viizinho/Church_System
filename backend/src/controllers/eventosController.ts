@@ -7,7 +7,11 @@ import { gerarOcorrencias, intervaloDaRegra, FUSO_PADRAO_MINUTOS, LIMITE_OCORREN
 
 const regraRecorrenciaSchema = z.object({
   diasSemana: z.array(z.number().int().min(0).max(6)).optional(),
-  intervalo: z.number().int().min(1).max(52).optional(),
+  intervalo: z.number().int().min(1).max(365).optional(),
+  unidade: z.literal('DIAS').optional(),
+  mensalPor: z.enum(['DIA_DO_MES', 'DIA_DA_SEMANA']).optional(),
+  semanaDoMes: z.number().int().refine((n) => [1, 2, 3, 4, -1].includes(n)).optional(),
+  diaSemanaMes: z.number().int().min(0).max(6).optional(),
   intervaloSemanas: z.number().int().min(1).max(52).optional(),
   criterioParada: z.union([
     z.object({ tipo: z.literal('DATA'), valor: z.string() }),
@@ -31,13 +35,18 @@ const escopoSchema = z.enum(['ocorrencia', 'serie']).optional()
 
 type DadosEvento = z.infer<typeof eventoSchema>
 
+function frequenciaDe(recorrencia: string, regra: RegraRecorrencia) {
+  if (recorrencia === 'MENSAL') return 'MENSAL' as const
+  return regra.unidade === 'DIAS' ? ('DIARIA' as const) : ('SEMANAL' as const)
+}
+
 /** Datas da série conforme o tipo de repetição escolhido (vazio = evento único). */
 function datasDaSerie(d: DadosEvento): Date[] {
   const inicio = new Date(d.inicio)
   if (d.recorrencia === 'NENHUMA') return [inicio]
   if (!d.regraRecorrencia) throw new AppError('Informe como o evento se repete.')
   const regra = d.regraRecorrencia as RegraRecorrencia
-  const frequencia = d.recorrencia === 'MENSAL' ? 'MENSAL' : 'SEMANAL'
+  const frequencia = frequenciaDe(d.recorrencia, regra)
   if (frequencia === 'SEMANAL' && !regra.diasSemana?.length) {
     throw new AppError('Escolha ao menos um dia da semana.')
   }
@@ -52,12 +61,22 @@ function datasDaSerie(d: DadosEvento): Date[] {
 /** Regra que fica gravada no evento “pai” da série. */
 function regraParaSalvar(d: DadosEvento) {
   if (d.recorrencia === 'NENHUMA' || !d.regraRecorrencia) return undefined
-  const r = d.regraRecorrencia
-  return {
-    ...(d.recorrencia === 'MENSAL' ? {} : { diasSemana: [...new Set(r.diasSemana ?? [])].sort((a, b) => a - b) }),
-    intervalo: intervaloDaRegra(r as RegraRecorrencia),
-    criterioParada: r.criterioParada,
+  const r = d.regraRecorrencia as RegraRecorrencia
+  const base = { intervalo: intervaloDaRegra(r), criterioParada: r.criterioParada }
+  const frequencia = frequenciaDe(d.recorrencia, r)
+  if (frequencia === 'DIARIA') return { unidade: 'DIAS', ...base }
+  if (frequencia === 'SEMANAL') return { diasSemana: [...new Set(r.diasSemana ?? [])].sort((a, b) => a - b), ...base }
+  if (r.mensalPor === 'DIA_DA_SEMANA') {
+    const inicio = new Date(d.inicio)
+    const parede = new Date(inicio.getTime() - d.fusoMinutos * 60_000)
+    return {
+      mensalPor: 'DIA_DA_SEMANA',
+      semanaDoMes: r.semanaDoMes ?? Math.ceil(parede.getUTCDate() / 7),
+      diaSemanaMes: r.diaSemanaMes ?? parede.getUTCDay(),
+      ...base,
+    }
   }
+  return base
 }
 
 type EventoComPai = {

@@ -81,6 +81,10 @@ export interface RegraRecorrencia {
   diasSemana?: number[]
   intervalo?: number
   intervaloSemanas?: number
+  unidade?: 'DIAS'
+  mensalPor?: 'DIA_DO_MES' | 'DIA_DA_SEMANA'
+  semanaDoMes?: number
+  diaSemanaMes?: number
   criterioParada: { tipo: 'DATA'; valor: string } | { tipo: 'OCORRENCIAS'; valor: number }
 }
 

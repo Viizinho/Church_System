@@ -10,12 +10,20 @@ export interface CriterioParadaOcorrencias {
 
 export type CriterioParada = CriterioParadaData | CriterioParadaOcorrencias
 
-export type FrequenciaRecorrencia = 'SEMANAL' | 'MENSAL'
+export type FrequenciaRecorrencia = 'DIARIA' | 'SEMANAL' | 'MENSAL'
 
 export interface RegraRecorrencia {
   /** Dias da semana (0 = domingo … 6 = sábado). Obrigatório na repetição semanal. */
   diasSemana?: number[]
-  /** A cada N semanas (semanal) ou N meses (mensal). */
+  /** 'DIAS' = repete a cada N dias (sem dias da semana). Sem isso, a regra é semanal. */
+  unidade?: 'DIAS'
+  /** Mensal: 'DIA_DA_SEMANA' = "primeira terça do mês"; padrão = mesmo dia do mês. */
+  mensalPor?: 'DIA_DO_MES' | 'DIA_DA_SEMANA'
+  /** Mensal por dia da semana: qual ocorrência no mês (1–4, ou -1 = última). */
+  semanaDoMes?: number
+  /** Mensal por dia da semana: 0 = domingo … 6 = sábado. */
+  diaSemanaMes?: number
+  /** A cada N dias, semanas ou meses. */
   intervalo?: number
   /** Nome antigo de `intervalo` (dados criados antes da unificação). */
   intervaloSemanas?: number
@@ -74,7 +82,13 @@ export function gerarOcorrencias(
     return resultado.length < max
   }
 
-  if (frequencia === 'SEMANAL') {
+  if (frequencia === 'DIARIA') {
+    for (let k = 0; k < LIMITE_OCORRENCIAS * 20; k++) {
+      const dia = diaZero + k * intervalo * DIA
+      if (limite !== null && dia > limite) break
+      if (!adicionar(dia)) break
+    }
+  } else if (frequencia === 'SEMANAL') {
     const dias = [...new Set(regra.diasSemana ?? [])].sort((a, b) => a - b)
     if (dias.length === 0) throw new Error('Escolha ao menos um dia da semana.')
     const domingo = diaZero - parede.getUTCDay() * DIA
@@ -84,6 +98,23 @@ export function gerarOcorrencias(
       for (const d of dias) {
         if (!adicionar(base + d * DIA)) return resultado
       }
+    }
+  } else if (regra.mensalPor === 'DIA_DA_SEMANA') {
+    const dow = regra.diaSemanaMes ?? parede.getUTCDay()
+    const nth = regra.semanaDoMes ?? Math.ceil(parede.getUTCDate() / 7)
+    for (let k = 0; k < 600; k++) {
+      const ano = parede.getUTCFullYear()
+      const mes = parede.getUTCMonth() + k * intervalo
+      let dia: number
+      if (nth === -1) {
+        const ultimo = new Date(Date.UTC(ano, mes + 1, 0))
+        dia = ultimo.getUTCDate() - ((ultimo.getUTCDay() - dow + 7) % 7)
+      } else {
+        const primeiro = new Date(Date.UTC(ano, mes, 1)).getUTCDay()
+        dia = 1 + ((dow - primeiro + 7) % 7) + (nth - 1) * 7
+      }
+      if (limite !== null && Date.UTC(ano, mes, dia) > limite) break
+      if (!adicionar(Date.UTC(ano, mes, dia))) break
     }
   } else {
     const diaDoMes = parede.getUTCDate()

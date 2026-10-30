@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/pt-br'
 import { ChevronLeft, ChevronRight, MapPin, Repeat, Search } from 'lucide-react'
 import api from '@/services/api'
-import type { Evento, RecorrenciaEvento, RegraRecorrencia, TipoEvento } from '@/types'
+import type { Evento, RegraRecorrencia, TipoEvento } from '@/types'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Input from '@/components/ui/Input'
@@ -12,7 +12,7 @@ import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Spinner from '@/components/ui/Spinner'
 import EmptyState from '@/components/ui/EmptyState'
-import { DIAS_SEMANA, descreverRecorrencia } from '@/utils/recorrencia'
+import { DIAS_SEMANA, POSICOES_MES, descreverRecorrencia, posicaoNoMes } from '@/utils/recorrencia'
 
 dayjs.locale('pt-br')
 
@@ -20,15 +20,25 @@ const tipoLabel: Record<TipoEvento, string> = { CULTO: 'Culto', REUNIAO: 'Reuni�
 const tipoVariant: Record<TipoEvento, 'purple' | 'blue' | 'amber'> = { CULTO: 'purple', REUNIAO: 'blue', ESPECIAL: 'amber' }
 const FUSO = new Date().getTimezoneOffset()
 
+/** Como o evento se repete na tela. 'DIAS' é gravado como PERSONALIZADA + unidade 'DIAS'. */
+type Modo = 'NENHUMA' | 'DIAS' | 'SEMANAL' | 'MENSAL'
+
 interface Formulario {
   nome: string
   descricao: string
   local: string
   inicio: string
   tipo: TipoEvento
-  recorrencia: RecorrenciaEvento
+  recorrencia: Modo
 }
 const FORM_VAZIO: Formulario = { nome: '', descricao: '', local: '', inicio: '', tipo: 'CULTO', recorrencia: 'NENHUMA' }
+
+function modoDoEvento(e: Evento): Modo {
+  const tipo = e.recorrenciaSerie ?? e.recorrencia
+  if (tipo === 'NENHUMA') return 'NENHUMA'
+  if (tipo === 'MENSAL') return 'MENSAL'
+  return e.regraSerie?.unidade === 'DIAS' ? 'DIAS' : 'SEMANAL'
+}
 
 const maiuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -47,6 +57,9 @@ export default function EventosPage() {
   const [form, setForm] = useState<Formulario>(FORM_VAZIO)
   const [diasSemana, setDiasSemana] = useState<number[]>([])
   const [intervalo, setIntervalo] = useState(1)
+  const [mensalPor, setMensalPor] = useState<'DIA_DO_MES' | 'DIA_DA_SEMANA'>('DIA_DO_MES')
+  const [semanaDoMes, setSemanaDoMes] = useState(1)
+  const [diaSemanaMes, setDiaSemanaMes] = useState(0)
   const [fimTipo, setFimTipo] = useState<'OCORRENCIAS' | 'DATA'>('OCORRENCIAS')
   const [fimOcorrencias, setFimOcorrencias] = useState(8)
   const [fimData, setFimData] = useState('')
@@ -83,7 +96,9 @@ export default function EventosPage() {
 
   function regraDoForm(): RegraRecorrencia {
     return {
+      ...(form.recorrencia === 'DIAS' ? { unidade: 'DIAS' as const } : {}),
       ...(form.recorrencia === 'SEMANAL' ? { diasSemana } : {}),
+      ...(form.recorrencia === 'MENSAL' && mensalPor === 'DIA_DA_SEMANA' ? { mensalPor, semanaDoMes, diaSemanaMes } : {}),
       intervalo,
       criterioParada: fimTipo === 'DATA' ? { tipo: 'DATA', valor: fimData } : { tipo: 'OCORRENCIAS', valor: fimOcorrencias },
     }
@@ -96,7 +111,7 @@ export default function EventosPage() {
       local: form.local.trim() || null,
       inicio: new Date(form.inicio).toISOString(),
       tipo: form.tipo,
-      recorrencia: recorrenciaEditavel ? form.recorrencia : 'NENHUMA',
+      recorrencia: !recorrenciaEditavel || form.recorrencia === 'NENHUMA' ? 'NENHUMA' : form.recorrencia === 'DIAS' ? 'PERSONALIZADA' : form.recorrencia,
       fusoMinutos: FUSO,
     }
     if (repete) payload.regraRecorrencia = regraDoForm()
@@ -106,7 +121,7 @@ export default function EventosPage() {
   const regraCompleta =
     repete &&
     !!form.inicio &&
-    (form.recorrencia === 'MENSAL' || diasSemana.length > 0) &&
+    (form.recorrencia !== 'SEMANAL' || diasSemana.length > 0) &&
     (fimTipo === 'OCORRENCIAS' ? fimOcorrencias >= 1 : !!fimData)
 
   // Prévia das datas que serão criadas (calculada no servidor, a mesma regra do salvar)
@@ -125,7 +140,7 @@ export default function EventosPage() {
     }, 300)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modal, regraCompleta, form.inicio, form.recorrencia, diasSemana, intervalo, fimTipo, fimOcorrencias, fimData])
+  }, [modal, regraCompleta, form.inicio, form.recorrencia, diasSemana, intervalo, mensalPor, semanaDoMes, diaSemanaMes, fimTipo, fimOcorrencias, fimData])
 
   function resetarRegra(regra?: RegraRecorrencia | null, inicio?: string) {
     setDiasSemana(regra?.diasSemana?.length ? regra.diasSemana : inicio ? [dayjs(inicio).day()] : [])
@@ -134,6 +149,10 @@ export default function EventosPage() {
     setFimTipo(fim?.tipo ?? 'OCORRENCIAS')
     setFimOcorrencias(fim?.tipo === 'OCORRENCIAS' ? fim.valor : 8)
     setFimData(fim?.tipo === 'DATA' ? fim.valor.slice(0, 10) : '')
+    setMensalPor(regra?.mensalPor ?? 'DIA_DO_MES')
+    const dia = inicio ? dayjs(inicio) : null
+    setSemanaDoMes(regra?.semanaDoMes ?? (dia ? posicaoNoMes(dia.date()) : 1))
+    setDiaSemanaMes(regra?.diaSemanaMes ?? dia?.day() ?? 0)
   }
 
   function openCreate() {
@@ -149,7 +168,7 @@ export default function EventosPage() {
     const inicio = dayjs(e.inicio).format('YYYY-MM-DDTHH:mm')
     setEditing(e)
     setEscopoEdicao('ocorrencia')
-    setForm({ nome: e.nome, descricao: e.descricao ?? '', local: e.local ?? '', inicio, tipo: e.tipo, recorrencia: e.recorrencia })
+    setForm({ nome: e.nome, descricao: e.descricao ?? '', local: e.local ?? '', inicio, tipo: e.tipo, recorrencia: modoDoEvento(e) })
     resetarRegra(e.regraSerie, inicio)
     setErroForm('')
     setModal(true)
@@ -163,6 +182,11 @@ export default function EventosPage() {
     setForm((f) => ({ ...f, inicio: valor }))
     // ao escolher a data pela primeira vez, já marca o dia da semana dela
     if (valor && diasSemana.length === 0) setDiasSemana([dayjs(valor).day()])
+    // "primeira terça do mês": acompanha a data escolhida até o usuário mexer
+    if (valor && !editing) {
+      setSemanaDoMes(posicaoNoMes(dayjs(valor).date()))
+      setDiaSemanaMes(dayjs(valor).day())
+    }
   }
 
   async function handleSave() {
@@ -225,7 +249,7 @@ export default function EventosPage() {
   const diaDoMesInicio = inicioDayjs?.date()
 
   const resumoForm = repete
-    ? descreverRecorrencia(form.recorrencia, regraDoForm(), diaDoMesInicio)
+    ? descreverRecorrencia(form.recorrencia === 'DIAS' ? 'PERSONALIZADA' : form.recorrencia, regraDoForm(), diaDoMesInicio)
     : null
 
   return (
@@ -350,20 +374,29 @@ export default function EventosPage() {
               <option value="ESPECIAL">Especial</option>
             </Select>
             {recorrenciaEditavel && (
-              <Select label="Repetição" value={form.recorrencia === 'PERSONALIZADA' ? 'SEMANAL' : form.recorrencia} onChange={(e) => setForm((f) => ({ ...f, recorrencia: e.target.value as RecorrenciaEvento }))}>
+              <Select label="Repetição" value={form.recorrencia} onChange={(e) => { setForm((f) => ({ ...f, recorrencia: e.target.value as Modo })); setIntervalo(1) }}>
                 <option value="NENHUMA">Não repete</option>
-                <option value="SEMANAL">Semanalmente</option>
-                <option value="MENSAL">Mensalmente</option>
+                <option value="DIAS">A cada N dias</option>
+                <option value="SEMANAL">Toda semana (escolhendo os dias)</option>
+                <option value="MENSAL">Todo mês</option>
               </Select>
             )}
           </div>
 
           {repete && (
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-4">
-              {form.recorrencia !== 'MENSAL' ? (
+              {form.recorrencia === 'DIAS' && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                  <span className="font-medium">Repetir a cada</span>
+                  <input type="number" min={1} max={365} value={intervalo} onChange={(e) => setIntervalo(Math.max(1, Number(e.target.value) || 1))} className="w-16 h-8 rounded-lg border border-gray-300 px-2 text-sm" />
+                  <span>{intervalo === 1 ? 'dia (todos os dias)' : 'dias'}</span>
+                </div>
+              )}
+
+              {form.recorrencia === 'SEMANAL' && (
                 <>
                   <div>
-                    <p className="text-xs font-medium text-gray-600 mb-2">Em quais dias da semana?</p>
+                    <p className="text-xs font-medium text-gray-600 mb-2">Em quais dias da semana? <span className="text-gray-400 font-normal">(ex.: só quinta = toda quinta)</span></p>
                     <div className="flex flex-wrap gap-1.5">
                       {DIAS_SEMANA.map((d) => (
                         <button
@@ -387,12 +420,31 @@ export default function EventosPage() {
                     <span className="text-gray-400">(1 = toda semana, 2 = quinzenal)</span>
                   </div>
                 </>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                  <span className="font-medium">Todo dia {diaDoMesInicio ?? '—'} do mês, a cada</span>
-                  <input type="number" min={1} max={12} value={intervalo} onChange={(e) => setIntervalo(Math.max(1, Number(e.target.value) || 1))} className="w-16 h-8 rounded-lg border border-gray-300 px-2 text-sm" />
-                  <span>{intervalo === 1 ? 'mês' : 'meses'}</span>
-                  {(diaDoMesInicio ?? 0) > 28 && <span className="text-gray-400">(em meses mais curtos, cai no último dia)</span>}
+              )}
+
+              {form.recorrencia === 'MENSAL' && (
+                <div className="space-y-2 text-xs text-gray-700">
+                  <label className="flex items-center gap-2">
+                    <input type="radio" checked={mensalPor === 'DIA_DO_MES'} onChange={() => setMensalPor('DIA_DO_MES')} />
+                    No mesmo dia do mês (dia {diaDoMesInicio ?? '—'})
+                    {(diaDoMesInicio ?? 0) > 28 && <span className="text-gray-400">· em meses curtos, cai no último dia</span>}
+                  </label>
+                  <label className="flex flex-wrap items-center gap-2">
+                    <input type="radio" checked={mensalPor === 'DIA_DA_SEMANA'} onChange={() => setMensalPor('DIA_DA_SEMANA')} />
+                    Sempre na
+                    <select value={semanaDoMes} onFocus={() => setMensalPor('DIA_DA_SEMANA')} onChange={(e) => { setMensalPor('DIA_DA_SEMANA'); setSemanaDoMes(Number(e.target.value)) }} className="h-8 rounded-lg border border-gray-300 px-2 text-sm bg-white">
+                      {POSICOES_MES.map((p) => <option key={p.valor} value={p.valor}>{p.label}</option>)}
+                    </select>
+                    <select value={diaSemanaMes} onFocus={() => setMensalPor('DIA_DA_SEMANA')} onChange={(e) => { setMensalPor('DIA_DA_SEMANA'); setDiaSemanaMes(Number(e.target.value)) }} className="h-8 rounded-lg border border-gray-300 px-2 text-sm bg-white">
+                      {DIAS_SEMANA.map((d) => <option key={d.valor} value={d.valor}>{d.longo}</option>)}
+                    </select>
+                    do mês
+                  </label>
+                  <div className="flex items-center gap-2 text-gray-600 pt-1">
+                    <span className="font-medium">A cada</span>
+                    <input type="number" min={1} max={12} value={intervalo} onChange={(e) => setIntervalo(Math.max(1, Number(e.target.value) || 1))} className="w-16 h-8 rounded-lg border border-gray-300 px-2 text-sm" />
+                    <span>{intervalo === 1 ? 'mês' : 'meses'}</span>
+                  </div>
                 </div>
               )}
 
