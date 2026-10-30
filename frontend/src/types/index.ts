@@ -82,6 +82,17 @@ export interface Manutencao {
   criadoEm: string
 }
 
+export interface AtivoRelatorio {
+  id: string
+  nome: string
+  descricao?: string | null
+  periodicidadeDias: number
+  ultimaManutencao?: string | null
+  proximaManutencao?: string | null
+  status: StatusManutencao
+  manutencoes: Manutencao[]
+}
+
 export interface Ativo {
   id: string
   nome: string
@@ -117,6 +128,7 @@ export interface Contribuicao {
   comprovanteUrl?: string | null
   status: StatusContribuicao
   motivoRecusa?: string | null
+  confirmadoEm?: string | null
   criadoEm: string
 }
 

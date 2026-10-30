@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import api from '@/services/api'
-import type { ItemCampanha, Contribuicao } from '@/types'
+import type { ItemCampanha, Contribuicao, StatusContribuicao } from '@/types'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Input from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Card, { CardBody } from '@/components/ui/Card'
 import Spinner from '@/components/ui/Spinner'
 import EmptyState from '@/components/ui/EmptyState'
@@ -12,7 +13,13 @@ import dayjs from 'dayjs'
 
 export default function CampanhaAdminPage() {
   const [itens, setItens] = useState<ItemCampanha[]>([])
-  const [pendentes, setPendentes] = useState<Contribuicao[]>([])
+  const [contribuicoes, setContribuicoes] = useState<Contribuicao[]>([])
+  const [aba, setAba] = useState<StatusContribuicao>('PENDENTE')
+  const [aprovando, setAprovando] = useState<Contribuicao | null>(null)
+  const [recusando, setRecusando] = useState<Contribuicao | null>(null)
+  const [motivo, setMotivo] = useState('')
+  const [processando, setProcessando] = useState(false)
+  const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<ItemCampanha | null>(null)
@@ -21,9 +28,9 @@ export default function CampanhaAdminPage() {
 
   async function load() {
     setLoading(true)
-    const [iRes, pRes] = await Promise.all([api.get('/campanha/itens'), api.get('/campanha/contribuicoes/pendentes')])
+    const [iRes, cRes] = await Promise.all([api.get('/campanha/itens'), api.get('/campanha/contribuicoes')])
     setItens(iRes.data)
-    setPendentes(pRes.data)
+    setContribuicoes(cRes.data)
     setLoading(false)
   }
 
@@ -57,16 +64,46 @@ export default function CampanhaAdminPage() {
     load()
   }
 
-  async function confirmar(id: string) {
-    await api.patch(`/campanha/contribuicoes/${id}/confirmar`)
-    load()
+  async function confirmarAprovacao() {
+    if (!aprovando) return
+    setProcessando(true)
+    setErro('')
+    try {
+      await api.patch(`/campanha/contribuicoes/${aprovando.id}/confirmar`)
+      setAprovando(null)
+      await load()
+    } catch {
+      setErro('Não foi possível aprovar a contribuição.')
+      setAprovando(null)
+    } finally {
+      setProcessando(false)
+    }
   }
 
-  async function recusar(id: string) {
-    const motivo = prompt('Motivo da recusa (opcional):')
-    await api.patch(`/campanha/contribuicoes/${id}/recusar`, { motivoRecusa: motivo })
-    load()
+  async function confirmarRecusa() {
+    if (!recusando) return
+    setProcessando(true)
+    setErro('')
+    try {
+      await api.patch(`/campanha/contribuicoes/${recusando.id}/recusar`, { motivoRecusa: motivo.trim() || null })
+      setRecusando(null)
+      setMotivo('')
+      await load()
+    } catch {
+      setErro('Não foi possível recusar a contribuição.')
+      setRecusando(null)
+    } finally {
+      setProcessando(false)
+    }
   }
+
+  const abas: { chave: StatusContribuicao; label: string }[] = [
+    { chave: 'PENDENTE', label: 'Pendentes' },
+    { chave: 'CONFIRMADO', label: 'Aprovadas' },
+    { chave: 'RECUSADO', label: 'Recusadas' },
+  ]
+  const contagem = (st: StatusContribuicao) => contribuicoes.filter((c) => c.status === st).length
+  const listaAba = contribuicoes.filter((c) => c.status === aba)
 
   if (loading) return <Spinner />
 
@@ -80,25 +117,66 @@ export default function CampanhaAdminPage() {
         <Button onClick={openCreate}>+ Novo item</Button>
       </div>
 
-      {pendentes.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">🕐 Contribuições pendentes ({pendentes.length})</h2>
+      {erro && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}
+
+      <div className="mb-8">
+        <h2 className="text-sm font-semibold text-gray-700 mb-1">Contribuições</h2>
+        <p className="text-xs text-gray-500 mb-3">
+          Só as contribuições <strong>aprovadas</strong> entram no valor arrecadado dos itens.
+        </p>
+
+        <div className="flex gap-1 border-b border-gray-200 mb-3">
+          {abas.map((a) => (
+            <button
+              key={a.chave}
+              onClick={() => setAba(a.chave)}
+              className={`px-3 py-2 text-sm -mb-px border-b-2 transition-colors ${
+                aba === a.chave
+                  ? 'border-primary-500 text-primary-600 font-medium'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {a.label} <span className="text-xs text-gray-400">({contagem(a.chave)})</span>
+            </button>
+          ))}
+        </div>
+
+        {listaAba.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">
+            {aba === 'PENDENTE' ? 'Nenhuma contribuição aguardando aprovação.' : 'Nada por aqui ainda.'}
+          </p>
+        ) : (
           <div className="space-y-2">
-            {pendentes.map((c) => (
-              <div key={c.id} className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-4">
-                <div className="flex-1">
+            {listaAba.map((c) => (
+              <div
+                key={c.id}
+                className={`rounded-xl border px-4 py-3 flex flex-wrap items-center gap-4 ${
+                  c.status === 'PENDENTE' ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'
+                }`}
+              >
+                <div className="flex-1 min-w-[200px]">
                   <p className="text-sm font-medium text-gray-900">{c.nomeContribuidor} — {c.item?.nome}</p>
-                  <p className="text-xs text-gray-500">R$ {Number(c.valor).toFixed(2)} · {dayjs(c.criadoEm).format('DD/MM/YYYY HH:mm')}</p>
+                  <p className="text-xs text-gray-500">
+                    R$ {Number(c.valor).toFixed(2)} · enviada em {dayjs(c.criadoEm).format('DD/MM/YYYY HH:mm')}
+                    {c.confirmadoEm && ` · analisada em ${dayjs(c.confirmadoEm).format('DD/MM/YYYY HH:mm')}`}
+                  </p>
+                  {c.status === 'RECUSADO' && c.motivoRecusa && (
+                    <p className="text-xs text-red-600 mt-0.5">Motivo: {c.motivoRecusa}</p>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => confirmar(c.id)} className="bg-green-600 hover:bg-green-700">✓ Confirmar</Button>
-                  <Button size="sm" variant="secondary" onClick={() => recusar(c.id)} className="text-red-600 border-red-300 hover:bg-red-50">✗ Recusar</Button>
-                </div>
+                {c.status === 'PENDENTE' ? (
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => setAprovando(c)} className="!bg-green-600 hover:!bg-green-700">✓ Aprovar</Button>
+                    <Button size="sm" variant="secondary" onClick={() => { setMotivo(''); setRecusando(c) }} className="text-red-600 border-red-300 hover:bg-red-50">✗ Recusar</Button>
+                  </div>
+                ) : (
+                  <Badge variant={c.status === 'CONFIRMADO' ? 'green' : 'red'}>{c.status === 'CONFIRMADO' ? 'Aprovada' : 'Recusada'}</Badge>
+                )}
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {itens.length === 0 ? <EmptyState message="Nenhum item cadastrado" icon="🎁" /> : (
         <div className="space-y-3">
@@ -148,6 +226,38 @@ export default function CampanhaAdminPage() {
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!aprovando}
+        title="Aprovar contribuição"
+        confirmLabel="Aprovar e contabilizar"
+        tone="success"
+        loading={processando}
+        onConfirm={confirmarAprovacao}
+        onCancel={() => setAprovando(null)}
+      >
+        <p>
+          Confirmar o recebimento de <strong>R$ {Number(aprovando?.valor ?? 0).toFixed(2)}</strong> de{' '}
+          <strong>{aprovando?.nomeContribuidor}</strong> para <strong>{aprovando?.item?.nome}</strong>?
+        </p>
+        <p className="text-xs text-gray-500">
+          Confira o Pix antes de aprovar. O valor será somado ao arrecadado e a página pública será atualizada na hora.
+        </p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={!!recusando}
+        title="Recusar contribuição"
+        confirmLabel="Recusar"
+        loading={processando}
+        onConfirm={confirmarRecusa}
+        onCancel={() => setRecusando(null)}
+      >
+        <p>
+          Recusar a contribuição de <strong>R$ {Number(recusando?.valor ?? 0).toFixed(2)}</strong> de{' '}
+          <strong>{recusando?.nomeContribuidor}</strong>? Ela não será contabilizada.
+        </p>
+        <Input label="Motivo (opcional)" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: Pix não localizado" />
+      </ConfirmDialog>
     </div>
   )
 }

@@ -123,3 +123,86 @@ export async function alertas(_req: Request, res: Response) {
 
   return res.json(alertas)
 }
+
+// ─── Relatório e edição de manutenções individuais ───────────────────────────
+
+/**
+ * Relatório de todas as manutenções agrupadas por ativo.
+ * Filtros opcionais: ?ativoId=, ?de=YYYY-MM-DD, ?ate=YYYY-MM-DD
+ */
+export async function relatorio(req: Request, res: Response) {
+  const { ativoId, de, ate } = req.query as Record<string, string | undefined>
+
+  const filtroData = {
+    ...(de ? { gte: new Date(de) } : {}),
+    ...(ate ? { lte: new Date(ate) } : {}),
+  }
+
+  const ativos = await prisma.ativo.findMany({
+    where: ativoId ? { id: ativoId } : {},
+    orderBy: { nome: 'asc' },
+    include: {
+      manutencoes: {
+        where: Object.keys(filtroData).length ? { data: filtroData } : {},
+        orderBy: { data: 'desc' },
+      },
+    },
+  })
+
+  // Status do ativo considera sempre a última manutenção real (sem o filtro de período)
+  const ultimas = await prisma.manutencao.groupBy({
+    by: ['ativoId'],
+    _max: { data: true },
+  })
+  const ultimaPorAtivo = new Map(ultimas.map((u) => [u.ativoId, u._max.data]))
+
+  const resultado = ativos.map((a) => {
+    const ultima = ultimaPorAtivo.get(a.id) ?? null
+    const proximaManutencao = ultima ? calcularProximaManutencao(ultima, a.periodicidadeDias) : null
+    return {
+      id: a.id,
+      nome: a.nome,
+      descricao: a.descricao,
+      periodicidadeDias: a.periodicidadeDias,
+      ultimaManutencao: ultima,
+      proximaManutencao,
+      status: calcularStatus(proximaManutencao),
+      manutencoes: a.manutencoes,
+    }
+  })
+
+  return res.json(resultado)
+}
+
+export async function atualizarManutencao(req: Request, res: Response) {
+  const { id } = req.params
+  const existente = await prisma.manutencao.findUnique({ where: { id } })
+  if (!existente) throw new AppError('Manutenção não encontrada.', 404)
+
+  const dados = manutencaoSchema.parse(req.body)
+  const manutencao = await prisma.manutencao.update({
+    where: { id },
+    data: {
+      data: new Date(dados.data),
+      descricao: dados.descricao,
+      responsavel: dados.responsavel,
+    },
+  })
+
+  // O status/próxima data do ativo são derivados em tempo de consulta, então
+  // basta devolver o ativo recalculado.
+  const ativo = await enriquecerAtivo(existente.ativoId)
+  return res.json({ manutencao, ativo })
+}
+
+export async function removerManutencao(req: Request, res: Response) {
+  const { id } = req.params
+  const existente = await prisma.manutencao.findUnique({ where: { id } })
+  if (!existente) throw new AppError('Manutenção não encontrada.', 404)
+
+  await prisma.manutencao.delete({ where: { id } })
+
+  // Status e próxima data são derivados; o cron diário já limpa os avisos resolvidos.
+  const ativo = await enriquecerAtivo(existente.ativoId)
+  return res.json({ ativo })
+}

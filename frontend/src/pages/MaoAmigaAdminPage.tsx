@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '@/services/api'
 import type { DoacaoAlimento, Membro } from '@/types'
 import Button from '@/components/ui/Button'
@@ -83,8 +84,6 @@ export default function MaoAmigaAdminPage() {
     load()
   }
 
-  async function confirmar(id: string) { await api.patch(`/mao-amiga/doacoes/${id}/confirmar`); load() }
-  async function recusar(id: string) { await api.patch(`/mao-amiga/doacoes/${id}/recusar`); load() }
 
   const statusVariant: Record<string, any> = { CONFIRMADO: 'green', PENDENTE: 'amber', RECUSADO: 'red' }
   const statusLabel: Record<string, string> = { CONFIRMADO: 'Confirmado', PENDENTE: 'Pendente', RECUSADO: 'Recusado' }
@@ -98,27 +97,22 @@ export default function MaoAmigaAdminPage() {
           <h1 className="text-xl font-semibold text-gray-900">Projeto Mão Amiga</h1>
           <p className="text-sm text-gray-500">Doações de alimentos</p>
         </div>
-        <Button onClick={() => { setForm({ membroId: '', nomeDoador: '', data: dayjs().format('YYYY-MM-DD'), itemDoado: '', quantidade: '', tipo: 'FISICA', metaCestaId: '', quantidadeNumerica: '' }); setModal(true) }}>+ Registrar doação</Button>
+        <div className="flex gap-2">
+          <Link to="/mao-amiga/confirmacoes"><Button variant="secondary">Confirmar envios{pendentes.length > 0 ? ` (${pendentes.length})` : ''}</Button></Link>
+          <Button onClick={() => { setForm({ membroId: '', nomeDoador: '', data: dayjs().format('YYYY-MM-DD'), itemDoado: '', quantidade: '', tipo: 'FISICA', metaCestaId: '', quantidadeNumerica: '' }); setModal(true) }}>+ Registrar doação</Button>
+        </div>
       </div>
 
       {pendentes.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">🕐 Pix pendentes ({pendentes.length})</h2>
-          <div className="space-y-2">
-            {pendentes.map((d) => (
-              <div key={d.id} className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-4">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{d.membro?.nomeCompleto ?? d.nomeDoador ?? 'Doador anônimo'} — Pix</p>
-                  <p className="text-xs text-gray-500">{dayjs(d.criadoEm).format('DD/MM/YYYY HH:mm')}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => confirmar(d.id)} className="bg-green-600 hover:bg-green-700">✓ Confirmar</Button>
-                  <Button size="sm" variant="secondary" onClick={() => recusar(d.id)} className="text-red-600 border-red-300 hover:bg-red-50">✗ Recusar</Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Link
+          to="/mao-amiga/confirmacoes"
+          className="mb-6 flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 hover:bg-amber-100 transition-colors"
+        >
+          <span className="text-sm font-medium text-gray-900">
+            🕐 {pendentes.length} {pendentes.length === 1 ? 'envio aguardando' : 'envios aguardando'} confirmação
+          </span>
+          <span className="text-sm font-medium text-amber-800">Revisar →</span>
+        </Link>
       )}
 
       {doacoes.length === 0 ? <EmptyState message="Nenhuma doação registrada" icon="🧺" /> : (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '@/services/api'
 import type { Ativo, Manutencao } from '@/types'
 import Button from '@/components/ui/Button'
@@ -8,6 +9,7 @@ import Modal from '@/components/ui/Modal'
 import Spinner from '@/components/ui/Spinner'
 import EmptyState from '@/components/ui/EmptyState'
 import dayjs from 'dayjs'
+import { formatarData } from '@/utils/data'
 
 function statusVariant(s: string) { return { VENCIDO: 'red', PROXIMO: 'amber', SEM_REGISTRO: 'gray', EM_DIA: 'green' }[s] as any }
 function statusLabel(s: string) { return { VENCIDO: 'Vencido', PROXIMO: 'Próximo', SEM_REGISTRO: 'Sem registro', EM_DIA: 'Em dia' }[s] ?? s }
@@ -83,7 +85,10 @@ export default function ManutencaoPage() {
           <h1 className="text-xl font-semibold text-gray-900">Manutenção</h1>
           <p className="text-sm text-gray-500">Controle de ativos da igreja</p>
         </div>
-        <Button onClick={openCreateAtivo}>+ Novo ativo</Button>
+        <div className="flex gap-2">
+          <Link to="/manutencao/relatorio"><Button variant="secondary">📋 Relatório por ativo</Button></Link>
+          <Button onClick={openCreateAtivo}>+ Novo ativo</Button>
+        </div>
       </div>
 
       {loading ? <Spinner /> : ativos.length === 0 ? <EmptyState message="Nenhum ativo cadastrado" icon="🔧" /> : (
@@ -99,8 +104,8 @@ export default function ManutencaoPage() {
                 <tr key={a.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{a.nome}</td>
                   <td className="px-4 py-3 text-gray-600">a cada {a.periodicidadeDias} dias</td>
-                  <td className="px-4 py-3 text-gray-600">{a.ultimaManutencao ? dayjs(a.ultimaManutencao.data).format('DD/MM/YYYY') : '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{a.proximaManutencao ? dayjs(a.proximaManutencao).format('DD/MM/YYYY') : '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{formatarData(a.ultimaManutencao?.data)}</td>
+                  <td className="px-4 py-3 text-gray-600">{formatarData(a.proximaManutencao)}</td>
                   <td className="px-4 py-3"><Badge variant={statusVariant(a.status)}>{statusLabel(a.status)}</Badge></td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
@@ -146,7 +151,7 @@ export default function ManutencaoPage() {
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {historico.map((h) => (
                   <div key={h.id} className="text-xs bg-gray-50 rounded-lg px-3 py-2">
-                    <span className="font-medium text-gray-700">{dayjs(h.data).format('DD/MM/YYYY')}</span>
+                    <span className="font-medium text-gray-700">{formatarData(h.data)}</span>
                     <span className="text-gray-500"> · {h.responsavel} · {h.descricao}</span>
                   </div>
                 ))}

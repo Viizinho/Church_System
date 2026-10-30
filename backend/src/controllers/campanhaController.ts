@@ -104,6 +104,19 @@ export async function listarPendentes(_req: Request, res: Response) {
   return res.json(pendentes)
 }
 
+export async function listarContribuicoes(req: Request, res: Response) {
+  const { status } = req.query as { status?: string }
+  const validos = ['PENDENTE', 'CONFIRMADO', 'RECUSADO']
+  if (status && !validos.includes(status)) throw new AppError('Status inválido.')
+
+  const contribuicoes = await prisma.contribuicao.findMany({
+    where: status ? { status: status as 'PENDENTE' | 'CONFIRMADO' | 'RECUSADO' } : {},
+    include: { item: { select: { id: true, nome: true } } },
+    orderBy: { criadoEm: 'desc' },
+  })
+  return res.json(contribuicoes)
+}
+
 export async function criarContribuicao(req: Request, res: Response) {
   const { itemId } = req.params
   const item = await prisma.itemCampanha.findUnique({ where: { id: itemId } })

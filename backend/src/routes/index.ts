@@ -52,6 +52,9 @@ router.post('/ativos', autenticar, manutencao.criarAtivo)
 router.put('/ativos/:id', autenticar, manutencao.atualizarAtivo)
 router.delete('/ativos/:id', autenticar, manutencao.removerAtivo)
 router.post('/ativos/:id/manutencoes', autenticar, manutencao.registrarManutencao)
+router.get('/manutencoes/relatorio', autenticar, manutencao.relatorio)
+router.put('/manutencoes/:id', autenticar, manutencao.atualizarManutencao)
+router.delete('/manutencoes/:id', autenticar, manutencao.removerManutencao)
 
 // ─── Campanha Jardim Cidade Universitária ─────────────────────────────────────
 // Admin
@@ -60,6 +63,7 @@ router.get('/campanha/itens/:id', autenticar, campanha.obterItem)
 router.post('/campanha/itens', autenticar, campanha.criarItem)
 router.put('/campanha/itens/:id', autenticar, campanha.atualizarItem)
 router.delete('/campanha/itens/:id', autenticar, campanha.removerItem)
+router.get('/campanha/contribuicoes', autenticar, campanha.listarContribuicoes)
 router.get('/campanha/contribuicoes/pendentes', autenticar, campanha.listarPendentes)
 router.patch('/campanha/contribuicoes/:id/confirmar', autenticar, campanha.confirmarContribuicao)
 router.patch('/campanha/contribuicoes/:id/recusar', autenticar, campanha.recusarContribuicao)
