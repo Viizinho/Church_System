@@ -69,7 +69,19 @@ export interface Evento {
   inicio: string
   tipo: TipoEvento
   recorrencia: RecorrenciaEvento
-  regraRecorrencia?: unknown
+  regraRecorrencia?: RegraRecorrencia | null
+  eventoPaiId?: string | null
+  /** Série a que o evento pertence (null = evento único) e a regra dela. */
+  serieId?: string | null
+  recorrenciaSerie?: RecorrenciaEvento
+  regraSerie?: RegraRecorrencia | null
+}
+
+export interface RegraRecorrencia {
+  diasSemana?: number[]
+  intervalo?: number
+  intervaloSemanas?: number
+  criterioParada: { tipo: 'DATA'; valor: string } | { tipo: 'OCORRENCIAS'; valor: number }
 }
 
 // ─── Manutenção ───────────────────────────────────────────────────────────────

@@ -39,6 +39,7 @@ router.delete('/cargos/:id', autenticar, cargos.remover)
 // ─── Eventos ──────────────────────────────────────────────────────────────────
 router.get('/eventos', autenticar, eventos.listar)
 router.get('/eventos/proximos', autenticar, eventos.proximosSete)
+router.post('/eventos/previa', autenticar, eventos.previa)
 router.get('/eventos/:id', autenticar, eventos.obter)
 router.post('/eventos', autenticar, eventos.criar)
 router.put('/eventos/:id', autenticar, eventos.atualizar)

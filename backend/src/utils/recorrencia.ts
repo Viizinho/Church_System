@@ -1,6 +1,6 @@
 export interface CriterioParadaData {
   tipo: 'DATA'
-  valor: string // ISO date
+  valor: string // YYYY-MM-DD (último dia, inclusive)
 }
 
 export interface CriterioParadaOcorrencias {
@@ -10,67 +10,90 @@ export interface CriterioParadaOcorrencias {
 
 export type CriterioParada = CriterioParadaData | CriterioParadaOcorrencias
 
+export type FrequenciaRecorrencia = 'SEMANAL' | 'MENSAL'
+
 export interface RegraRecorrencia {
-  diasSemana: number[] // 0=domingo ... 6=sábado
-  intervaloSemanas: number // 1 = toda semana, 2 = quinzenal, etc.
+  /** Dias da semana (0 = domingo … 6 = sábado). Obrigatório na repetição semanal. */
+  diasSemana?: number[]
+  /** A cada N semanas (semanal) ou N meses (mensal). */
+  intervalo?: number
+  /** Nome antigo de `intervalo` (dados criados antes da unificação). */
+  intervaloSemanas?: number
   criterioParada: CriterioParada
 }
 
-const LIMITE_SEGURANCA_OCORRENCIAS = 200 // trava contra regras mal configuradas (ex: sem critério de parada coerente)
+/** Trava contra regras mal configuradas. */
+export const LIMITE_OCORRENCIAS = 200
+
+/** Fuso padrão (Brasília, UTC-3) usado quando o cliente não informa o seu. */
+export const FUSO_PADRAO_MINUTOS = 180
+
+const MIN = 60_000
+const DIA = 24 * 60 * MIN
+
+export function intervaloDaRegra(regra: RegraRecorrencia): number {
+  return Math.max(1, regra.intervalo ?? regra.intervaloSemanas ?? 1)
+}
 
 /**
- * Gera as datas de ocorrência de um evento recorrente a partir da data inicial e da regra.
- * A primeira ocorrência (dataInicial) sempre é incluída caso bata com os diasSemana;
- * caso contrário, a busca começa no primeiro dia da semana que corresponder.
+ * Gera as datas de uma série recorrente, a partir da data inicial (inclusive).
+ *
+ * Os cálculos são feitos no "relógio de parede" do usuário (instante − fuso, lendo
+ * com getters UTC). Assim o dia da semana e o horário não mudam quando o servidor
+ * roda em UTC — um culto às 21h em Brasília continua sendo "domingo", e não segunda.
+ *
+ * @param fusoMinutos resultado de `Date#getTimezoneOffset()` do cliente (UTC-3 → 180)
  */
-export function gerarOcorrencias(dataInicial: Date, regra: RegraRecorrencia): Date[] {
-  if (!regra.diasSemana?.length) {
-    throw new Error('Informe ao menos um dia da semana para a recorrência.')
-  }
-  if (regra.intervaloSemanas < 1) {
-    throw new Error('O intervalo de semanas deve ser maior ou igual a 1.')
-  }
+export function gerarOcorrencias(
+  inicio: Date,
+  frequencia: FrequenciaRecorrencia,
+  regra: RegraRecorrencia,
+  fusoMinutos: number = FUSO_PADRAO_MINUTOS
+): Date[] {
+  const intervalo = intervaloDaRegra(regra)
+  const parede = new Date(inicio.getTime() - fusoMinutos * MIN)
+  const diaZero = Date.UTC(parede.getUTCFullYear(), parede.getUTCMonth(), parede.getUTCDate())
+  const horario = parede.getTime() - diaZero
 
-  const ocorrencias: Date[] = []
-  const diasSemanaOrdenados = [...regra.diasSemana].sort((a, b) => a - b)
-
-  const dataLimite =
-    regra.criterioParada.tipo === 'DATA' ? new Date(regra.criterioParada.valor) : null
-  const maxOcorrencias =
+  const max =
     regra.criterioParada.tipo === 'OCORRENCIAS'
-      ? regra.criterioParada.valor
-      : LIMITE_SEGURANCA_OCORRENCIAS
+      ? Math.min(regra.criterioParada.valor, LIMITE_OCORRENCIAS)
+      : LIMITE_OCORRENCIAS
+  const limite =
+    regra.criterioParada.tipo === 'DATA'
+      ? Date.parse(regra.criterioParada.valor.slice(0, 10) + 'T00:00:00Z') + DIA - 1
+      : null
+  if (limite !== null && Number.isNaN(limite)) throw new Error('Data final inválida.')
 
-  // início da semana (domingo) da data inicial, preservando o horário
-  const horas = dataInicial.getHours()
-  const minutos = dataInicial.getMinutes()
-
-  let inicioSemana = new Date(dataInicial)
-  inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay())
-  inicioSemana.setHours(0, 0, 0, 0)
-
-  let semanaAtual = 0
-  let seguranca = 0
-
-  while (ocorrencias.length < maxOcorrencias && seguranca < LIMITE_SEGURANCA_OCORRENCIAS * 10) {
-    seguranca++
-
-    for (const dia of diasSemanaOrdenados) {
-      const candidato = new Date(inicioSemana)
-      candidato.setDate(candidato.getDate() + dia + semanaAtual * 7 * regra.intervaloSemanas)
-      candidato.setHours(horas, minutos, 0, 0)
-
-      if (candidato < dataInicial) continue
-      if (dataLimite && candidato > dataLimite) {
-        return ocorrencias
-      }
-
-      ocorrencias.push(candidato)
-      if (ocorrencias.length >= maxOcorrencias) break
-    }
-
-    semanaAtual++
+  const resultado: Date[] = []
+  const adicionar = (diaParede: number): boolean => {
+    const c = diaParede + horario
+    if (c < parede.getTime()) return true // antes do início: ignora
+    if (limite !== null && c > limite) return false
+    resultado.push(new Date(c + fusoMinutos * MIN))
+    return resultado.length < max
   }
 
-  return ocorrencias
+  if (frequencia === 'SEMANAL') {
+    const dias = [...new Set(regra.diasSemana ?? [])].sort((a, b) => a - b)
+    if (dias.length === 0) throw new Error('Escolha ao menos um dia da semana.')
+    const domingo = diaZero - parede.getUTCDay() * DIA
+    for (let semana = 0; semana < 1200; semana++) {
+      const base = domingo + semana * intervalo * 7 * DIA
+      if (limite !== null && base > limite) break
+      for (const d of dias) {
+        if (!adicionar(base + d * DIA)) return resultado
+      }
+    }
+  } else {
+    const diaDoMes = parede.getUTCDate()
+    for (let k = 0; k < 600; k++) {
+      const mes = parede.getUTCMonth() + k * intervalo
+      const ano = parede.getUTCFullYear()
+      const ultimo = new Date(Date.UTC(ano, mes + 1, 0)).getUTCDate()
+      // dia 31 em mês curto cai no último dia do mês
+      if (!adicionar(Date.UTC(ano, mes, Math.min(diaDoMes, ultimo)))) return resultado
+    }
+  }
+  return resultado
 }
