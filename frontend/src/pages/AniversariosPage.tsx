@@ -3,7 +3,7 @@ import api from '@/services/api'
 import type { Membro } from '@/types'
 import Card, { CardBody, CardHeader } from '@/components/ui/Card'
 import Spinner from '@/components/ui/Spinner'
-import dayjs from 'dayjs'
+import { formatarDiaMes } from '@/utils/data'
 
 type MembroAniv = Membro & { diffDias: number; proximoAniversario: string }
 
@@ -25,20 +25,20 @@ export default function AniversariosPage() {
 
   function MembroRow({ m }: { m: MembroAniv }) {
     return (
-      <div className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
+      <div className={`flex items-center gap-3 py-3 border-b border-gray-50 last:border-0 ${m.diffDias === 0 ? 'bg-amber-50 -mx-5 px-5 rounded-lg border-transparent' : ''}`}>
         <div className="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center text-sm font-bold text-primary-600 flex-shrink-0">
           {m.nomeCompleto.charAt(0)}
         </div>
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-900">{m.nomeCompleto}</p>
-          <p className="text-xs text-gray-500">{m.cargos.map((c) => c.cargo.nome).join(', ') || 'Membro'}</p>
+          <p className="text-xs text-gray-500">{m.cargos.map((c) => c.cargo.nome).join(', ') || 'Sem cargo'}</p>
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold text-primary-600">
-            {dayjs(m.dataNascimento).format('DD/MM')}
+            {formatarDiaMes(m.dataNascimento)}
           </p>
           <p className="text-xs text-gray-500">
-            {m.diffDias === 0 ? '🎉 Hoje!' : `em ${m.diffDias} dia${m.diffDias !== 1 ? 's' : ''}`}
+            {m.diffDias === 0 ? '🎉 Hoje!' : m.diffDias === 1 ? 'Amanhã' : `em ${m.diffDias} dias`}
           </p>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { z } from 'zod'
 import prisma from '../utils/prisma'
 import { AppError } from '../utils/AppError'
+import { diasAteAniversario, proximoAniversario } from '../utils/aniversario'
 
 const membroSchema = z.object({
   nomeCompleto: z.string().min(2, 'Nome deve ter ao menos 2 caracteres.'),
@@ -167,7 +168,6 @@ export async function remover(req: Request, res: Response) {
 export async function aniversariantes(req: Request, res: Response) {
   const { periodo } = req.query // 'semana' | 'mes'
 
-  const hoje = new Date()
   const membros = await prisma.membro.findMany({
     where: { status: 'ATIVO', dataNascimento: { not: null } },
     select: {
@@ -183,10 +183,7 @@ export async function aniversariantes(req: Request, res: Response) {
   const comAniversario = membros
     .map((m) => {
       const nasc = m.dataNascimento!
-      const aniversario = new Date(hoje.getFullYear(), nasc.getMonth(), nasc.getDate())
-      if (aniversario < hoje) aniversario.setFullYear(hoje.getFullYear() + 1)
-      const diffDias = Math.ceil((aniversario.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-      return { ...m, diffDias, proximoAniversario: aniversario }
+      return { ...m, diffDias: diasAteAniversario(nasc), proximoAniversario: proximoAniversario(nasc) }
     })
     .filter((m) => (periodo === 'mes' ? m.diffDias <= 30 : m.diffDias <= 7))
     .sort((a, b) => a.diffDias - b.diffDias)

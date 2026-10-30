@@ -93,7 +93,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500">{m.cargos.map((c) => c.cargo.nome).join(', ')}</p>
                   </div>
                   <span className="text-xs font-medium text-primary-600">
-                    {m.diffDias === 0 ? 'Hoje 🎉' : `em ${m.diffDias}d`}
+                    {m.diffDias === 0 ? 'Hoje 🎉' : m.diffDias === 1 ? 'Amanhã' : `em ${m.diffDias}d`}
                   </span>
                 </div>
               ))

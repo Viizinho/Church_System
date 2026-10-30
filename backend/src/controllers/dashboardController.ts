@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import prisma from '../utils/prisma'
+import { diasAteAniversario } from '../utils/aniversario'
 import { calcularProximaManutencao, calcularStatus } from '../utils/manutencao'
 
 export async function resumo(_req: Request, res: Response) {
@@ -28,13 +29,7 @@ export async function resumo(_req: Request, res: Response) {
   })
 
   const aniversariantes = membrosComAniversario
-    .map((m) => {
-      const nasc = m.dataNascimento!
-      const aniversario = new Date(hoje.getFullYear(), nasc.getMonth(), nasc.getDate())
-      if (aniversario < hoje) aniversario.setFullYear(hoje.getFullYear() + 1)
-      const diffDias = Math.ceil((aniversario.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-      return { ...m, diffDias }
-    })
+    .map((m) => ({ ...m, diffDias: diasAteAniversario(m.dataNascimento!) }))
     .filter((m) => m.diffDias <= 7)
     .sort((a, b) => a.diffDias - b.diffDias)
 

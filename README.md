@@ -41,7 +41,8 @@ igreja-gestao/
 ├── backend/
 │   ├── prisma/
 │   │   ├── schema.prisma   # Modelo do banco
-│   │   └── seed.ts         # Dados iniciais
+│   │   ├── seed.ts         # Dados iniciais
+│   │   └── seed-demo.ts    # Dados de exemplo p/ apresentação (npm run db:seed:demo, ver DEMO.md)
 │   └── src/
 │       ├── controllers/    # Lógica de cada módulo
 │       ├── middlewares/    # Auth JWT + error handler
