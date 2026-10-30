@@ -50,7 +50,7 @@ export default function AniversariosPage() {
   if (loading) return <Spinner />
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl">
+    <div className="p-4 sm:p-6 2xl:px-10">
       <PageHeader title="Aniversários" subtitle="Apenas membros ativos" />
       {erro && <p role="alert" className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">Não foi possível carregar os aniversários.</p>}
 

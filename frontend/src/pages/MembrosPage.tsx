@@ -167,7 +167,7 @@ export default function MembrosPage() {
   )
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl">
+    <div className="p-4 sm:p-6 2xl:px-10">
       <PageHeader
         title="Membros"
         subtitle={

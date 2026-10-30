@@ -45,7 +45,7 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl">
+    <div className="p-4 sm:p-6 2xl:px-10">
       <PageHeader title="Dashboard" subtitle={dayjs().format('dddd, D [de] MMMM [de] YYYY')} />
 
       {/* Metrics */}
