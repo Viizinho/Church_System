@@ -10,8 +10,8 @@ export const IGREJA = {
 }
 
 export const REDES_FALLBACK = {
-  instagramUrl: '',
+  instagramUrl: 'https://www.instagram.com/adpb_jcu/',
   facebookUrl: '',
-  youtubeUrl: '',
+  youtubeUrl: 'https://www.youtube.com/@adpbjardimcidadeuniversitaria',
   whatsappContato: '5583999990010',
 }
