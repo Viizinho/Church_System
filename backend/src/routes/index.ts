@@ -85,6 +85,7 @@ router.put('/mao-amiga/metas/:id', autenticar, maoAmiga.atualizarMeta)
 router.delete('/mao-amiga/metas/:id', autenticar, maoAmiga.removerMeta)
 // Público
 router.post('/publico/mao-amiga/pix', maoAmiga.registrarPixPublico)
+router.post('/publico/mao-amiga/doacoes', maoAmiga.registrarDoacaoPublica)
 router.get('/publico/mao-amiga/metas', publico.metasMaoAmigaPublicas)
 
 // ─── Área Pública (Landing Page) ───────────────────────────────────────────────

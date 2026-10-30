@@ -16,8 +16,22 @@ const doacaoSchema = z.object({
 })
 
 const pixPublicoSchema = z.object({
-  nomeDoador: z.string().min(2),
+  nomeDoador: z.string().trim().min(2, 'Informe seu nome.'),
+  valor: z.number().positive('Valor deve ser positivo.').max(100000).optional().nullable(),
   comprovanteUrl: z.string().url().optional().nullable(),
+})
+
+const doacaoPublicaSchema = z.object({
+  nomeDoador: z.string().trim().min(2, 'Informe seu nome.'),
+  itens: z
+    .array(
+      z.object({
+        metaCestaId: z.string().uuid(),
+        quantidade: z.number().positive('Quantidade deve ser positiva.'),
+      })
+    )
+    .min(1, 'Escolha ao menos um item.')
+    .max(20),
 })
 
 const recusarSchema = z.object({
@@ -34,6 +48,15 @@ const metaCestaSchema = z.object({
 async function calcularArrecadado(metaCestaId: string): Promise<number> {
   const result = await prisma.doacaoAlimento.aggregate({
     where: { metaCestaId, status: 'CONFIRMADO' },
+    _sum: { quantidadeNumerica: true },
+  })
+  return Number(result._sum.quantidadeNumerica ?? 0)
+}
+
+/** Quantidade já prometida por doações que ainda aguardam confirmação. */
+async function calcularReservado(metaCestaId: string): Promise<number> {
+  const result = await prisma.doacaoAlimento.aggregate({
+    where: { metaCestaId, status: 'PENDENTE' },
     _sum: { quantidadeNumerica: true },
   })
   return Number(result._sum.quantidadeNumerica ?? 0)
@@ -156,7 +179,7 @@ export async function registrarPixPublico(req: Request, res: Response) {
       nomeDoador: dados.nomeDoador,
       data: new Date(),
       itemDoado: 'Pix — compra de alimentos',
-      quantidade: '—',
+      quantidade: dados.valor ? `R$ ${dados.valor.toFixed(2).replace('.', ',')}` : '—',
       tipo: 'PIX',
       comprovanteUrl: dados.comprovanteUrl ?? null,
       status: 'PENDENTE',
@@ -164,6 +187,52 @@ export async function registrarPixPublico(req: Request, res: Response) {
   })
 
   return res.status(201).json(doacao)
+}
+
+/**
+ * Doação de alimentos feita pelo visitante na página pública: ele escolhe os
+ * itens e as quantidades; cada item vira uma doação PENDENTE (aguarda conferência
+ * do administrador). Pendentes contam como "reservado" para evitar que várias
+ * pessoas doem o mesmo item além do necessário.
+ */
+export async function registrarDoacaoPublica(req: Request, res: Response) {
+  const dados = doacaoPublicaSchema.parse(req.body)
+
+  const ids = dados.itens.map((i) => i.metaCestaId)
+  if (new Set(ids).size !== ids.length) throw new AppError('Item repetido na doação.')
+
+  const criar: Parameters<typeof prisma.doacaoAlimento.create>[0][] = []
+
+  for (const item of dados.itens) {
+    const meta = await prisma.metaCesta.findUnique({ where: { id: item.metaCestaId } })
+    if (!meta || !meta.ativo) throw new AppError('Item da cesta não encontrado.', 404)
+
+    const [arrecadado, reservado] = await Promise.all([calcularArrecadado(meta.id), calcularReservado(meta.id)])
+    const disponivel = Number(meta.quantidadeNecessaria) - arrecadado - reservado
+
+    if (disponivel <= 0) {
+      throw new AppError(`A meta de "${meta.nomeItem}" já foi atingida. Escolha outro item.`)
+    }
+    if (item.quantidade > disponivel) {
+      throw new AppError(`Só faltam ${disponivel} ${meta.unidade} de "${meta.nomeItem}". Ajuste a quantidade.`)
+    }
+
+    criar.push({
+      data: {
+        nomeDoador: dados.nomeDoador,
+        data: new Date(),
+        itemDoado: meta.nomeItem,
+        quantidade: `${item.quantidade} ${meta.unidade}`,
+        quantidadeNumerica: item.quantidade,
+        metaCestaId: meta.id,
+        tipo: 'FISICA',
+        status: 'PENDENTE',
+      },
+    })
+  }
+
+  const doacoes = await prisma.$transaction(criar.map((c) => prisma.doacaoAlimento.create(c)))
+  return res.status(201).json(doacoes)
 }
 
 export async function confirmar(req: Request, res: Response) {

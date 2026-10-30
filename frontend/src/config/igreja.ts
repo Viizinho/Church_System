@@ -15,3 +15,11 @@ export const REDES_FALLBACK = {
   youtubeUrl: 'https://www.youtube.com/@adpbjardimcidadeuniversitaria',
   whatsappContato: '5583999990010',
 }
+
+// Projeto Mão Amiga (página pública)
+export const MAO_AMIGA = {
+  chavePix: 'cesta.solidaria@gmail.com',
+  // O comprovante do Pix é enviado para o mesmo WhatsApp de contato da igreja
+  whatsapp: REDES_FALLBACK.whatsappContato,
+  entrega: 'na secretaria da igreja, de segunda a sábado, das 8h às 17h',
+}

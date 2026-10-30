@@ -33,18 +33,30 @@ export async function metasMaoAmigaPublicas(_req: Request, res: Response) {
 
   const comProgresso = await Promise.all(
     metas.map(async (meta) => {
-      const soma = await prisma.doacaoAlimento.aggregate({
-        where: { metaCestaId: meta.id, status: 'CONFIRMADO' },
-        _sum: { quantidadeNumerica: true },
-      })
-      const arrecadado = Number(soma._sum.quantidadeNumerica ?? 0)
+      const [confirmadas, pendentes] = await Promise.all([
+        prisma.doacaoAlimento.aggregate({
+          where: { metaCestaId: meta.id, status: 'CONFIRMADO' },
+          _sum: { quantidadeNumerica: true },
+        }),
+        prisma.doacaoAlimento.aggregate({
+          where: { metaCestaId: meta.id, status: 'PENDENTE' },
+          _sum: { quantidadeNumerica: true },
+        }),
+      ])
+      const arrecadado = Number(confirmadas._sum.quantidadeNumerica ?? 0)
+      const reservado = Number(pendentes._sum.quantidadeNumerica ?? 0)
       const necessario = Number(meta.quantidadeNecessaria)
+      // "restante" = o que ainda dá para doar (já descontadas as doações aguardando conferência)
+      const restante = Math.max(necessario - arrecadado - reservado, 0)
       return {
         id: meta.id,
         nomeItem: meta.nomeItem,
         unidade: meta.unidade,
-        restante: Math.max(necessario - arrecadado, 0),
-        completo: arrecadado >= necessario,
+        necessario,
+        arrecadado,
+        reservado,
+        restante,
+        completo: restante <= 0,
       }
     })
   )
