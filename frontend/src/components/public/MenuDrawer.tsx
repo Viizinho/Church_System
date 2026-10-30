@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Lock, Menu, X } from 'lucide-react'
 
@@ -11,6 +12,19 @@ const LINKS = [
 
 export default function MenuDrawer() {
   const [aberto, setAberto] = useState(false)
+
+  // Trava a rolagem da página e permite fechar com Esc enquanto o menu está aberto
+  useEffect(() => {
+    if (!aberto) return
+    const overflowAnterior = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && setAberto(false)
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.body.style.overflow = overflowAnterior
+      document.removeEventListener('keydown', aoTeclar)
+    }
+  }, [aberto])
 
   return (
     <>
@@ -32,9 +46,9 @@ export default function MenuDrawer() {
         </Link>
       </nav>
 
-      {aberto && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="w-72 bg-white h-full p-6 flex flex-col gap-5 shadow-xl">
+      {aberto && createPortal(
+        <div className="fixed inset-0 z-50 flex md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="w-72 max-w-[85vw] bg-white h-full overflow-y-auto p-6 flex flex-col gap-5 shadow-xl">
             <button onClick={() => setAberto(false)} aria-label="Fechar menu" className="self-end p-1">
               <X size={22} />
             </button>
@@ -53,7 +67,8 @@ export default function MenuDrawer() {
             </Link>
           </div>
           <div className="flex-1 bg-black/40" onClick={() => setAberto(false)} />
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )
