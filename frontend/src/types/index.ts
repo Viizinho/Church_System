@@ -147,6 +147,8 @@ export interface DoacaoAlimento {
   tipo: TipoDoacao
   comprovanteUrl?: string | null
   status: StatusDoacao
+  motivoRecusa?: string | null
+  confirmadoEm?: string | null
   criadoEm: string
 }
 

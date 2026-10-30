@@ -14,7 +14,6 @@ import EventosPage from '@/pages/EventosPage'
 import ManutencaoPage from '@/pages/ManutencaoPage'
 import CampanhaAdminPage from '@/pages/CampanhaAdminPage'
 import MaoAmigaAdminPage from '@/pages/MaoAmigaAdminPage'
-import MaoAmigaConfirmacoesPage from '@/pages/MaoAmigaConfirmacoesPage'
 import RelatorioManutencoesPage from '@/pages/RelatorioManutencoesPage'
 
 export default function App() {
@@ -44,7 +43,6 @@ export default function App() {
             <Route path="manutencao/relatorio" element={<RelatorioManutencoesPage />} />
             <Route path="campanha" element={<CampanhaAdminPage />} />
             <Route path="mao-amiga" element={<MaoAmigaAdminPage />} />
-            <Route path="mao-amiga/confirmacoes" element={<MaoAmigaConfirmacoesPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -20,6 +20,10 @@ const pixPublicoSchema = z.object({
   comprovanteUrl: z.string().url().optional().nullable(),
 })
 
+const recusarSchema = z.object({
+  motivoRecusa: z.string().optional().nullable(),
+})
+
 const metaCestaSchema = z.object({
   nomeItem: z.string().min(2),
   unidade: z.string().min(1).default('kg'),
@@ -170,20 +174,26 @@ export async function confirmar(req: Request, res: Response) {
 
   const atualizada = await prisma.doacaoAlimento.update({
     where: { id },
-    data: { status: 'CONFIRMADO' },
+    data: { status: 'CONFIRMADO', confirmadoPor: req.usuarioId, confirmadoEm: new Date() },
   })
   return res.json(atualizada)
 }
 
 export async function recusar(req: Request, res: Response) {
   const { id } = req.params
+  const { motivoRecusa } = recusarSchema.parse(req.body ?? {})
   const doacao = await prisma.doacaoAlimento.findUnique({ where: { id } })
   if (!doacao) throw new AppError('Doação não encontrada.', 404)
   if (doacao.status !== 'PENDENTE') throw new AppError('Doação já processada.')
 
   const atualizada = await prisma.doacaoAlimento.update({
     where: { id },
-    data: { status: 'RECUSADO' },
+    data: {
+      status: 'RECUSADO',
+      motivoRecusa: motivoRecusa ?? null,
+      confirmadoPor: req.usuarioId,
+      confirmadoEm: new Date(),
+    },
   })
   return res.json(atualizada)
 }
