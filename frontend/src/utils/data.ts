@@ -14,3 +14,9 @@ export function formatarData(iso?: string | null): string {
 export function paraInputData(iso: string): string {
   return iso.slice(0, 10)
 }
+
+/** Dia e mês (ex.: aniversário), sem deslocamento de fuso. */
+export function formatarDiaMes(iso?: string | null): string {
+  if (!iso) return '—'
+  return dayjs(iso.slice(0, 10)).format('DD/MM')
+}

@@ -14,23 +14,33 @@ const membroSchema = z.object({
   cargoIds: z.array(z.string().uuid()).optional(),
   categoriaIds: z.array(z.string().uuid()).optional(),
   conjuntoIds: z.array(z.string().uuid()).optional(),
-  consentimentoImagem: z.boolean(),
+  naoQuerImagemGravada: z.boolean().optional(),
 })
 
-function validarConsentimento(consentimentoImagem: boolean) {
-  if (!consentimentoImagem) {
-    throw new AppError('O Consenso de Uso da Imagem é obrigatório para o cadastro.')
-  }
+/** Aceita lista em CSV ("a,b") ou repetida (?x=a&x=b) e devolve os ids sem vazios. */
+function listaParam(valor: unknown): string[] {
+  const itens = Array.isArray(valor) ? valor : [valor]
+  return itens
+    .flatMap((v) => String(v ?? '').split(','))
+    .map((v) => v.trim())
+    .filter(Boolean)
 }
 
 export async function listar(req: Request, res: Response) {
-  const { busca, status, cargoId, categoriaId } = req.query
+  const { busca, status } = req.query
+  // Filtros múltiplos: dentro de cada grupo vale "qualquer um dos marcados";
+  // entre grupos (cargo, categoria, conjunto, status, busca) vale "e".
+  // cargoId/categoriaId (singular) continuam aceitos por compatibilidade.
+  const cargoIds = listaParam(req.query.cargoIds ?? req.query.cargoId)
+  const categoriaIds = listaParam(req.query.categoriaIds ?? req.query.categoriaId)
+  const conjuntoIds = listaParam(req.query.conjuntoIds ?? req.query.conjuntoId)
 
   const membros = await prisma.membro.findMany({
     where: {
       ...(status ? { status: status as 'ATIVO' | 'INATIVO' } : {}),
-      ...(cargoId ? { cargos: { some: { cargoId: String(cargoId) } } } : {}),
-      ...(categoriaId ? { categorias: { some: { categoriaId: String(categoriaId) } } } : {}),
+      ...(cargoIds.length ? { cargos: { some: { cargoId: { in: cargoIds } } } } : {}),
+      ...(categoriaIds.length ? { categorias: { some: { categoriaId: { in: categoriaIds } } } } : {}),
+      ...(conjuntoIds.length ? { conjuntos: { some: { conjuntoId: { in: conjuntoIds } } } } : {}),
       ...(busca
         ? {
             OR: [
@@ -66,17 +76,14 @@ export async function obter(req: Request, res: Response) {
 }
 
 export async function criar(req: Request, res: Response) {
-  const { cargoIds, categoriaIds, conjuntoIds, dataNascimento, consentimentoImagem, ...dados } =
+  const { cargoIds, categoriaIds, conjuntoIds, dataNascimento, naoQuerImagemGravada, ...dados } =
     membroSchema.parse(req.body)
-
-  validarConsentimento(consentimentoImagem)
 
   const membro = await prisma.membro.create({
     data: {
       ...dados,
       dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
-      consentimentoImagem,
-      consentimentoImagemData: new Date(),
+      naoQuerImagemGravada: naoQuerImagemGravada ?? false,
       cargos: cargoIds?.length ? { create: cargoIds.map((cargoId) => ({ cargoId })) } : undefined,
       categorias: categoriaIds?.length
         ? { create: categoriaIds.map((categoriaId) => ({ categoriaId })) }
@@ -100,10 +107,8 @@ export async function atualizar(req: Request, res: Response) {
   const existente = await prisma.membro.findUnique({ where: { id } })
   if (!existente) throw new AppError('Membro não encontrado.', 404)
 
-  const { cargoIds, categoriaIds, conjuntoIds, dataNascimento, consentimentoImagem, ...dados } =
+  const { cargoIds, categoriaIds, conjuntoIds, dataNascimento, naoQuerImagemGravada, ...dados } =
     membroSchema.parse(req.body)
-
-  validarConsentimento(consentimentoImagem)
 
   const membro = await prisma.$transaction(async (tx) => {
     if (cargoIds !== undefined) {
@@ -136,7 +141,8 @@ export async function atualizar(req: Request, res: Response) {
       data: {
         ...dados,
         dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
-        consentimentoImagem,
+        // só altera quando o campo vem na requisição
+        ...(naoQuerImagemGravada !== undefined ? { naoQuerImagemGravada } : {}),
       },
       include: {
         cargos: { include: { cargo: true } },

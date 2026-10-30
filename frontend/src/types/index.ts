@@ -52,7 +52,8 @@ export interface Membro {
   cargos: MembroCargo[]
   categorias: MembroCategoria[]
   conjuntos: MembroConjunto[]
-  consentimentoImagem: boolean
+  /** Marcado quando a pessoa não quer ter a imagem (fotos/vídeos) gravada */
+  naoQuerImagemGravada: boolean
   criadoEm: string
 }
 

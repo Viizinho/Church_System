@@ -25,9 +25,9 @@ async function main() {
     prisma.cargo.upsert({ where: { nome: 'Pastor' }, update: {}, create: { nome: 'Pastor', descricao: 'Líder pastoral da igreja' } }),
     prisma.cargo.upsert({ where: { nome: 'Presbítero' }, update: {}, create: { nome: 'Presbítero', descricao: 'Ancião da congregação' } }),
     prisma.cargo.upsert({ where: { nome: 'Diácono' }, update: {}, create: { nome: 'Diácono', descricao: 'Servo da congregação' } }),
-    prisma.cargo.upsert({ where: { nome: 'Diaconisa' }, update: {}, create: { nome: 'Diaconisa', descricao: 'Serva da congregação' } }),
     prisma.cargo.upsert({ where: { nome: 'Coord. Mocidade' }, update: {}, create: { nome: 'Coord. Mocidade', descricao: 'Coordenador(a) do ministério de jovens' } }),
-    prisma.cargo.upsert({ where: { nome: 'Membro' }, update: {}, create: { nome: 'Membro', descricao: 'Membro efetivo' } }),
+    prisma.cargo.upsert({ where: { nome: 'Auxiliar' }, update: {}, create: { nome: 'Auxiliar', descricao: 'Auxiliar da congregação' } }),
+    prisma.cargo.upsert({ where: { nome: 'Secretária' }, update: {}, create: { nome: 'Secretária', descricao: 'Secretaria da igreja' } }),
   ])
   console.log(`✅ ${cargos.length} cargos criados`)
 
@@ -54,7 +54,7 @@ async function main() {
   console.log(`✅ ${conjuntos.length} conjuntos musicais criados`)
 
   // Membros
-  const [cargoPastor, , , , , cargoMembro] = cargos
+  const [cargoPastor, , , , cargoAuxiliar, cargoSecretaria] = cargos
   const membro1 = await prisma.membro.create({
     data: {
       nomeCompleto: 'Roberto Silva',
@@ -62,8 +62,6 @@ async function main() {
       telefone: '(83) 99999-0001',
       email: 'pastor@igreja.com',
       status: StatusMembro.ATIVO,
-      consentimentoImagem: true,
-      consentimentoImagemData: new Date(),
       cargos: { create: [{ cargoId: cargoPastor.id }] },
     },
   })
@@ -73,9 +71,7 @@ async function main() {
       dataNascimento: new Date('1985-06-01'),
       telefone: '(83) 99999-0002',
       status: StatusMembro.ATIVO,
-      consentimentoImagem: true,
-      consentimentoImagemData: new Date(),
-      cargos: { create: [{ cargoId: cargoMembro.id }] },
+      cargos: { create: [{ cargoId: cargoSecretaria.id }] },
       categorias: { create: [{ categoriaId: categorias[5].id }] }, // Músico
       conjuntos: { create: [{ conjuntoId: conjuntos[2].id }] }, // Filhas de Jerusalém
     },
@@ -86,9 +82,7 @@ async function main() {
       dataNascimento: new Date('1995-06-05'),
       telefone: '(83) 99999-0003',
       status: StatusMembro.ATIVO,
-      consentimentoImagem: true,
-      consentimentoImagemData: new Date(),
-      cargos: { create: [{ cargoId: cargoMembro.id }] },
+      cargos: { create: [{ cargoId: cargoAuxiliar.id }] },
       categorias: { create: [{ categoriaId: categorias[4].id }] }, // Professor EBD Jovens
     },
   })
