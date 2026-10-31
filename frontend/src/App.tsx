@@ -10,6 +10,8 @@ import Spinner from '@/components/ui/Spinner'
 // a landing page (a mais visitada, por pessoas no celular) não carrega o código do painel administrativo.
 const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
+const EsqueciSenhaPage = lazy(() => import('@/pages/EsqueciSenhaPage'))
+const RedefinirSenhaPage = lazy(() => import('@/pages/RedefinirSenhaPage'))
 const CampanhaPublicaPage = lazy(() => import('@/pages/CampanhaPublicaPage'))
 const MaoAmigaPublicaPage = lazy(() => import('@/pages/MaoAmigaPublicaPage'))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
@@ -31,6 +33,8 @@ export default function App() {
               {/* Público */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
+              <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
               <Route path="/contribuir" element={<CampanhaPublicaPage />} />
               <Route path="/doar" element={<MaoAmigaPublicaPage />} />
 

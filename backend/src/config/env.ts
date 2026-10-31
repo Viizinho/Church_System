@@ -15,6 +15,8 @@ const schema = z.object({
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   /** Liga/desliga o job diário de alertas (desligue em réplicas extras). */
   ENABLE_CRON: bool.default(true),
+  /** Endereço público do sistema (usado no link do e-mail de recuperação de senha). */
+  APP_URL: z.string().url().default('http://localhost:5173'),
   /** Pasta do build do frontend para servir junto com a API. */
   FRONTEND_DIST: z.string().optional(),
 })
@@ -36,6 +38,12 @@ if (isProd) {
     console.error('❌ JWT_SECRET fraco para produção: use 32+ caracteres aleatórios (ex.: `openssl rand -hex 48`).')
     process.exit(1)
   }
+}
+
+// O link de recuperação vai por e-mail: em produção precisa apontar para o site real, em HTTPS.
+if (isProd && !/^https:\/\//.test(env.APP_URL)) {
+  console.error('❌ APP_URL deve ser o endereço público em HTTPS (ex.: https://app.suaigreja.org) — usado no link de recuperação de senha.')
+  process.exit(1)
 }
 
 export const corsOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)

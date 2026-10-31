@@ -31,6 +31,7 @@ Revisão completa do código (backend, frontend, banco e dependências) feita co
 | 10 | Média | Dois visitantes doando o último item ao mesmo tempo estouravam a meta | transação `Serializable` + verificação dentro dela |
 | 11 | Média | Seed criava `admin@igreja.com / admin123` sem aviso | seeds de exemplo recusam `NODE_ENV=production`; novo `db:seed:admin` exige e-mail/senha forte por variável |
 | 12 | Média | Sem como trocar a senha | `PUT /api/auth/senha` + tela *Alterar senha* (10+ caracteres, letras e números) |
+| 12b | Média | Sem recuperação de senha segura | "Esqueci minha senha" por e-mail: token de 256 bits (só o SHA-256 vai ao banco), validade de 30 min, uso único e atômico, pedido novo invalida os anteriores, resposta idêntica exista ou não o e-mail (sem enumeração, e sem diferença de tempo, pois o envio é assíncrono), 5 pedidos/h por IP e 1 e-mail/2 min por conta, link com o token no fragmento `#` (não vai a logs nem ao Referer), e-mail de aviso após a troca, sessões antigas encerradas (`senhaAlteradaEm` conferido em cada requisição) e o link nunca é escrito nos logs em produção |
 | 13 | Baixa | Campos sem tamanho máximo, status/tipo de query sem validação (500 em valor inválido) | limites em todos os schemas; `enumQuery` valida filtros (400) |
 | 14 | Baixa | JSON malformado e corpo grande davam 500 | 400 / 413 com mensagem; corpo limitado a 100 kB |
 | 15 | Baixa | Erros do Prisma (duplicado, FK) viravam 500 | 409 / 404 com mensagem amigável |
@@ -64,7 +65,7 @@ Revisão completa do código (backend, frontend, banco e dependências) feita co
 
 1. **Não foi possível rodar contra PostgreSQL real neste ambiente** (o download do motor do Prisma é bloqueado). A lógica foi validada com um banco em memória; rode `npx prisma generate`, `npm run db:deploy` e `npm test` no seu computador antes de publicar.
 2. **Docker:** `Dockerfile`/`docker-compose.yml` escritos mas **não testados** (sem daemon disponível aqui).
-3. **Token no `localStorage`:** a CSP restritiva reduz o risco de roubo por XSS; a evolução natural é cookie `HttpOnly` + proteção CSRF. Não há revogação de token (logout só apaga no navegador; validade de 12 h).
+3. **Token no `localStorage`:** a CSP restritiva reduz o risco de roubo por XSS; a evolução natural é cookie `HttpOnly` + proteção CSRF. Trocar ou redefinir a senha agora encerra todas as sessões; o botão Sair só apaga o token no navegador (validade de 12 h).
 4. **Um único perfil de usuário:** todo login é administrador. Se vier mais de uma pessoa, criar papéis (ex.: tesoureiro só vê Campanha/Mão Amiga).
 5. **Comprovantes:** a página pública pede *link* do comprovante (não há upload). Se for adotar upload de imagem, validar tipo/tamanho e guardar fora do servidor da aplicação.
 6. **LGPD:** a lista de membros contém dados pessoais (telefone, endereço, data de nascimento, preferência de imagem). Publicar com HTTPS, backup criptografado do banco e texto de privacidade na landing page.
