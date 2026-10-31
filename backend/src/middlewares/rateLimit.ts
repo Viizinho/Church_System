@@ -38,3 +38,21 @@ export const limiteApi = rateLimit({
   legacyHeaders: false,
   message: mensagem('Muitas requisições. Tente novamente em instantes.'),
 })
+
+/** Pedidos de recuperação de senha: poucos por hora por IP (evita encher a caixa de e-mail de alguém). */
+export const limiteRecuperacaoSenha = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: mensagem('Muitos pedidos de recuperação de senha. Tente novamente mais tarde.'),
+})
+
+/** Tentativas de usar o link de redefinição (o token já é impossível de adivinhar; isto é cinto e suspensório). */
+export const limiteRedefinicaoSenha = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: mensagem('Muitas tentativas. Aguarde alguns minutos e tente de novo.'),
+})

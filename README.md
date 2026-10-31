@@ -84,13 +84,15 @@ npm test              # testes da API, recorrência de eventos, aniversários e 
 npm run audit:prod    # vulnerabilidades conhecidas nas dependências de produção
 ```
 
+**Esqueci minha senha:** o link chega por e-mail (30 min, uso único, token só em hash no banco, resposta igual exista ou não o e-mail, limites por IP e por conta; ao redefinir, as sessões abertas são encerradas). Em desenvolvimento, sem SMTP, o e-mail aparece no terminal da API.
+
 O relatório da última revisão (segurança, desempenho, código morto) está em [docs/DIAGNOSTICO.md](./docs/DIAGNOSTICO.md).
 
 ## Publicar na internet
 
 A API serve o frontend compilado, então é **um serviço só** (sem CORS) + um PostgreSQL.
 
-1. **Variáveis** (veja `backend/.env.example`): `DATABASE_URL`, `JWT_SECRET` (`openssl rand -hex 48`), `NODE_ENV=production`, `TRUST_PROXY=1` (Render/Railway/Nginx). O servidor **se recusa a subir** com segredo fraco.
+1. **Variáveis** (veja `backend/.env.example`): `DATABASE_URL`, `JWT_SECRET` (`openssl rand -hex 48`), `NODE_ENV=production`, `TRUST_PROXY=1` (Render/Railway/Nginx), `APP_URL` (endereço público em HTTPS) e `SMTP_HOST/PORT/USER/PASS/FROM` (e-mail, necessário para o "Esqueci minha senha"). O servidor **se recusa a subir** com segredo fraco ou `APP_URL` sem HTTPS.
 2. **Build e migração:** `npm ci && npm run build --workspace=frontend && npm run build --workspace=backend` e, no deploy, `npm run db:deploy --workspace=backend` (aplica migrações sem apagar dados).
 3. **Administrador (produção):** `ADMIN_EMAIL=... ADMIN_PASSWORD='...' npm run db:seed:admin --workspace=backend`. Os seeds de exemplo (`db:seed`, `db:seed:demo`) **recusam rodar** com `NODE_ENV=production`.
 4. **Iniciar:** `npm start` (ou use o `Dockerfile` / `docker-compose.yml` da raiz). Health checks: `/health` e `/ready` (confere o banco).

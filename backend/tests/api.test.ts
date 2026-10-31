@@ -31,7 +31,7 @@ const casa = (r: Row, w: Row = {}): boolean =>
 const modelo = (nome: string) => {
   const t = (tabelas[nome] ??= [])
   return {
-    create: async ({ data }: Row) => { const r = { id: 'id' + ++seq, criadoEm: new Date(), ...(nome === 'contribuicao' ? { status: 'PENDENTE' } : {}), ...data }; t.push(r); return r },
+    create: async ({ data }: Row) => { const r = { id: 'id' + ++seq, criadoEm: new Date(), ...(nome === 'contribuicao' ? { status: 'PENDENTE' } : {}), ...(nome === 'tokenRecuperacaoSenha' ? { usadoEm: null } : {}), ...data }; t.push(r); return r },
     findUnique: async ({ where }: Row) => t.find((r) => casa(r, where)) ?? null,
     findUniqueOrThrow: async ({ where }: Row) => { const r = t.find((x) => casa(x, where)); if (!r) throw new Error('não achou'); return r },
     findMany: async ({ where, take }: Row = {}) => t.filter((r) => casa(r, where)).slice(0, take),
@@ -165,6 +165,50 @@ async function main() {
   ok((await req('PUT', '/api/auth/senha', { senhaAtual: 'SenhaForte123', novaSenha: 'NovaSenha1234' }, auth)).status === 204, 'troca de senha → 204')
   ok((await req('POST', '/api/auth/login', { email: 'admin@igreja.com', senha: 'NovaSenha1234' })).status === 200, 'login com a nova senha')
   ok((await req('POST', '/api/auth/login', { email: 'admin@igreja.com', senha: 'SenhaForte123' })).status === 401, 'senha antiga deixa de valer')
+
+  // 7b. Recuperação de senha
+  const emails: string[] = []
+  const logOriginal = console.log
+  console.log = (...a: any[]) => { const t = a.join(' '); t.startsWith('[email:simulado]') ? emails.push(t) : logOriginal(...a) }
+  const esperar = () => new Promise((r) => setTimeout(r, 150))
+  const eNovo = await req('POST', '/api/auth/esqueci-senha', { email: 'ninguem@x.com' })
+  const eAdmin = await req('POST', '/api/auth/esqueci-senha', { email: ' Admin@igreja.com ' })
+  await esperar()
+  ok(eNovo.status === 202 && eAdmin.status === 202 && JSON.stringify(eNovo.json) === JSON.stringify(eAdmin.json), 'esqueci-senha: resposta idêntica para e-mail existente e inexistente')
+  ok(emails.length === 1 && emails[0].includes('Para: admin@igreja.com'), 'esqueci-senha: e-mail enviado só para a conta existente', String(emails.length))
+  const link = emails[0]?.match(/redefinir-senha#token=([A-Za-z0-9_-]+)/)
+  const tokenRec = link?.[1] ?? ''
+  ok(tokenRec.length >= 40 && !emails[0].includes('?token='), 'link usa fragmento (#) e token longo (256 bits)', tokenRec.length + '')
+  ok(tabelas.tokenRecuperacaoSenha?.length === 1 && tabelas.tokenRecuperacaoSenha[0].tokenHash !== tokenRec && tabelas.tokenRecuperacaoSenha[0].tokenHash.length === 64, 'banco guarda só o hash SHA-256 do token')
+  await req('POST', '/api/auth/esqueci-senha', { email: 'admin@igreja.com' })
+  await esperar()
+  ok(emails.length === 1, 'novo pedido em menos de 2 min não gera outro e-mail (anti-spam por conta)')
+
+  ok((await req('POST', '/api/auth/redefinir-senha', { token: 'x'.repeat(43), novaSenha: 'OutraSenha1234' })).status === 400, 'redefinir com token inexistente → 400')
+  ok((await req('POST', '/api/auth/redefinir-senha', { token: tokenRec, novaSenha: 'fraca' })).status === 400, 'redefinir com senha fraca → 400 (e o link continua valido)')
+  const tokenAntigo = jwt.sign({ sub: 'u1', nome: 'Admin', iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET!, { algorithm: 'HS256', expiresIn: '1h' })
+  const [r1, r2] = await Promise.all([
+    req('POST', '/api/auth/redefinir-senha', { token: tokenRec, novaSenha: 'SenhaRecuperada99' }),
+    req('POST', '/api/auth/redefinir-senha', { token: tokenRec, novaSenha: 'SenhaRecuperada99' }),
+  ])
+  ok([r1.status, r2.status].sort().join() === '204,400', 'link de uso único: cliques simultâneos → um 204 e um 400', `${r1.status},${r2.status}`)
+  ok((await req('POST', '/api/auth/redefinir-senha', { token: tokenRec, novaSenha: 'OutraSenha1234' })).status === 400, 'reutilizar o link → 400')
+  ok((await req('POST', '/api/auth/login', { email: 'admin@igreja.com', senha: 'SenhaRecuperada99' })).status === 200, 'login com a senha redefinida')
+  ok((await req('POST', '/api/auth/login', { email: 'admin@igreja.com', senha: 'NovaSenha1234' })).status === 401, 'senha anterior deixa de valer')
+  ok((await req('GET', '/api/auth/perfil', undefined, { authorization: 'Bearer ' + tokenAntigo })).status === 401, 'sessão aberta antes da redefinição é encerrada → 401')
+  await esperar()
+  ok(emails.length === 2 && /alterada/i.test(emails[1]), 'aviso de "senha alterada" enviado ao dono da conta')
+
+  // link vencido
+  const crypto = await import('crypto')
+  tabelas.tokenRecuperacaoSenha.push({ id: 'old', usuarioId: 'u1', tokenHash: crypto.createHash('sha256').update('vencido'.repeat(8)).digest('hex'), expiraEm: new Date(Date.now() - 1000), usadoEm: null, criadoEm: new Date() })
+  const venc = await req('POST', '/api/auth/redefinir-senha', { token: 'vencido'.repeat(8), novaSenha: 'OutraSenha1234' })
+  ok(venc.status === 400 && /inválido ou expirado/.test(venc.json.error), 'link vencido → 400 com mensagem genérica')
+
+  let lim = 0
+  for (let i = 0; i < 6; i++) lim = (await req('POST', '/api/auth/esqueci-senha', { email: `x${i}@x.com` })).status
+  ok(lim === 429, 'pedidos de recuperação são limitados por IP → 429', String(lim))
+  console.log = logOriginal
 
   // 8. SSE
   const sse = await new Promise<{ status: number; tipo: string }>((resolve) => {

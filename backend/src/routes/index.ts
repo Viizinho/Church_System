@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { autenticar } from '../middlewares/autenticar'
-import { limiteEnvioPublico, limiteLeituraPublica, limiteLogin } from '../middlewares/rateLimit'
+import { limiteEnvioPublico, limiteLeituraPublica, limiteLogin, limiteRecuperacaoSenha, limiteRedefinicaoSenha } from '../middlewares/rateLimit'
 
 import * as auth from '../controllers/authController'
 import * as membros from '../controllers/membrosController'
@@ -16,6 +16,8 @@ const router = Router()
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 router.post('/auth/login', limiteLogin, auth.login)
+router.post('/auth/esqueci-senha', limiteRecuperacaoSenha, auth.esqueciSenha)
+router.post('/auth/redefinir-senha', limiteRedefinicaoSenha, auth.redefinirSenha)
 router.get('/auth/perfil', autenticar, auth.perfil)
 router.put('/auth/senha', autenticar, limiteLogin, auth.alterarSenha)
 

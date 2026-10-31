@@ -17,9 +17,26 @@ model Usuario {
   telefone       String?
   receberAlertas Boolean      @default(true) @map("receber_alertas")
   criadoEm       DateTime     @default(now()) @map("criado_em")
+  /// Tokens JWT emitidos antes desta data deixam de valer (troca/redefinição de senha).
+  senhaAlteradaEm DateTime?   @map("senha_alterada_em")
   manutencoes    Manutencao[]
+  tokensRecuperacao TokenRecuperacaoSenha[]
 
   @@map("usuarios")
+}
+
+/// Link de "esqueci minha senha": só o hash (SHA-256) é guardado, de uso único e curta duração.
+model TokenRecuperacaoSenha {
+  id        String    @id @default(uuid())
+  usuarioId String    @map("usuario_id")
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiraEm  DateTime  @map("expira_em")
+  usadoEm   DateTime? @map("usado_em")
+  criadoEm  DateTime  @default(now()) @map("criado_em")
+
+  @@index([usuarioId, criadoEm])
+  @@map("tokens_recuperacao_senha")
 }
 
 // ─── Membros ─────────────────────────────────────────────────────────────────

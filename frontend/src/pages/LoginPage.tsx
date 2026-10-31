@@ -47,7 +47,10 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@igreja.com" required />
-          <Input label="Senha" type="password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••••" required />
+          <Input label="Senha" type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••••" required />
+          <div className="text-right -mt-2">
+            <Link to="/esqueci-senha" className="text-xs font-medium text-primary-600 hover:underline">Esqueci minha senha</Link>
+          </div>
           {erro && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}
           <Button type="submit" loading={loading} className="w-full justify-center mt-2">
             Entrar
