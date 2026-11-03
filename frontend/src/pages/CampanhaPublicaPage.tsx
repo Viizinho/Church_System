@@ -23,6 +23,11 @@ export default function CampanhaPublicaPage({ embedded = false }: Props) {
   const [nome, setNome] = useState('')
   const [etapa, setEtapa] = useState<'selecao' | 'pix'>('selecao')
   const [saving, setSaving] = useState(false)
+  const [erro, setErro] = useState('')
+
+  // RN-05: só dá para contribuir até o que ainda falta para completar o item
+  const restante = selected ? Math.max(Number(selected.valorTotal) - Number(selected.valorArrecadado), 0) : 0
+  const sugeridos = valoresSugeridos.filter((v) => v < restante)
 
   useEffect(() => {
     // Rota pública (a /campanha/itens exige login e derrubaria o visitante na tela de admin)
@@ -56,6 +61,7 @@ export default function CampanhaPublicaPage({ embedded = false }: Props) {
     setValor(null)
     setValorCustom('')
     setNome('')
+    setErro('')
     setEtapa('selecao')
   }
 
@@ -63,10 +69,20 @@ export default function CampanhaPublicaPage({ embedded = false }: Props) {
     if (!selected) return
     const v = valor ?? Number(valorCustom)
     if (!v || !nome) return
+    if (v > restante) {
+      setErro(`Faltam ${formatarMoeda(restante)} para completar este item. Ajuste o valor.`)
+      return
+    }
     setSaving(true)
-    await api.post(`/publico/campanha/${selected.id}/contribuir`, { nomeContribuidor: nome, valor: v })
-    setSaving(false)
-    setEtapa('pix')
+    setErro('')
+    try {
+      await api.post(`/publico/campanha/${selected.id}/contribuir`, { nomeContribuidor: nome, valor: v })
+      setEtapa('pix')
+    } catch (e) {
+      setErro((e as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Não foi possível registrar a contribuição. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function abrirWhatsApp(item: ItemCampanha) {
@@ -124,26 +140,28 @@ export default function CampanhaPublicaPage({ embedded = false }: Props) {
           <div className="space-y-4">
             <Input label="Seu nome *" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Como você quer ser identificado" />
             <div>
-              <p className="text-xs font-medium text-gray-600 mb-2">Quanto você quer contribuir?</p>
+              <p className="text-xs font-medium text-gray-600 mb-1">Quanto você quer contribuir?</p>
+              <p className="text-xs text-gray-500 mb-2">Faltam {formatarMoeda(restante)} para completar este item.</p>
               <div className="grid grid-cols-2 gap-2 mb-2">
-                {valoresSugeridos.map((v) => (
+                {sugeridos.map((v) => (
                   <button key={v} type="button" onClick={() => { setValor(v); setValorCustom('') }}
                     className={`py-2.5 rounded-lg text-sm border transition-colors ${valor === v ? 'bg-primary-500 text-white border-primary-500' : 'border-gray-300 text-gray-700 hover:border-primary-400'}`}>
                     R$ {v}
                   </button>
                 ))}
-                <button type="button" onClick={() => { setValor(null) }}
-                  className={`col-span-2 py-2.5 rounded-lg text-sm border transition-colors ${!valor && !valorCustom ? 'border-gray-300' : valor === null ? 'bg-primary-500 text-white border-primary-500' : 'border-gray-300 text-gray-700 hover:border-primary-400'}`}>
-                  Valor inteiro — {formatarMoeda(selected?.valorTotal)}
+                <button type="button" onClick={() => { setValor(restante); setValorCustom('') }}
+                  className={`col-span-2 py-2.5 rounded-lg text-sm border transition-colors ${valor === restante ? 'bg-primary-500 text-white border-primary-500' : 'border-gray-300 text-gray-700 hover:border-primary-400'}`}>
+                  Completar o item — {formatarMoeda(restante)}
                 </button>
               </div>
               <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 h-10">
                 <span className="text-sm text-gray-500">R$</span>
-                <input type="number" placeholder="Outro valor" value={valorCustom}
+                <input type="number" placeholder="Outro valor" value={valorCustom} min={1} max={restante} step="0.01" aria-label="Outro valor"
                   onChange={(e) => { setValorCustom(e.target.value); setValor(null) }}
                   className="flex-1 text-sm outline-none bg-transparent" />
               </div>
             </div>
+            {erro && <p role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}
             <Button className="w-full justify-center" onClick={handleContribuir} loading={saving}
               disabled={!nome || (!valor && !valorCustom)}>
               Ver chave Pix →

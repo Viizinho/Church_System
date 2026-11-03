@@ -74,8 +74,9 @@ export default function CampanhaAdminPage() {
       await api.patch(`/campanha/contribuicoes/${aprovando.id}/confirmar`)
       setAprovando(null)
       await load()
-    } catch {
-      setErro('Não foi possível aprovar a contribuição.')
+    } catch (e) {
+      // Ex.: aprovar passaria do valor total do item (RN-05) — o servidor explica o motivo
+      setErro((e as { response?: { data?: { error?: string } } }).response?.data?.error ?? 'Não foi possível aprovar a contribuição.')
       setAprovando(null)
     } finally {
       setProcessando(false)

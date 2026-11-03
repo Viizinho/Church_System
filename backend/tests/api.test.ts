@@ -2,7 +2,7 @@
  * Teste de ponta a ponta da API (Express real + banco em memória).
  * Roda sem Postgres:  npx tsx tests/api.test.ts
  * Cobre: cabeçalhos de segurança, autenticação/JWT, rate limit, validação (XSS por URL),
- * corrida de aprovação, estouro de meta, troca de senha e handler de erros.
+ * corrida de aprovação, estouro de meta (cesta e campanha), troca de senha e handler de erros.
  */
 process.env.DATABASE_URL ??= 'postgres://teste'
 process.env.JWT_SECRET ??= 'segredo-de-teste-com-mais-de-32-caracteres!!'
@@ -143,6 +143,21 @@ async function main() {
   const itens = await req('GET', '/api/publico/campanha')
   ok(itens.json[0].valorArrecadado === 100, 'total arrecadado conta a contribuição uma única vez')
   ok((await req('GET', '/api/campanha/contribuicoes?status=QUALQUER', undefined, auth)).status === 400, 'status inválido na query → 400')
+
+  // 4b. RN-05: o arrecadado nunca passa do valor total do item (1000; já há 100 aprovados)
+  const contribuir = (valor: number, nome = 'Pedro') => req('POST', '/api/publico/campanha/item1/contribuir', { nomeContribuidor: nome, valor })
+  const acima = await contribuir(950)
+  ok(acima.status === 400 && /Faltam R\$\s?900,00/.test(acima.json.error), 'contribuição acima do que falta é recusada (faltam R$ 900)', JSON.stringify(acima.json))
+  ok((await contribuir(900, 'Ana')).status === 201 && (await contribuir(900, 'Bia')).status === 201, 'duas pendentes de R$ 900 são aceitas (pendente não reserva)')
+  const [pAna, pBia] = ['Ana', 'Bia'].map((n) => tabelas.contribuicao.find((c) => c.nomeContribuidor === n)!)
+  ok((await req('PATCH', `/api/campanha/contribuicoes/${pAna.id}/confirmar`, undefined, auth)).status === 200, 'aprovar a primeira completa o item')
+  const estouro = await req('PATCH', `/api/campanha/contribuicoes/${pBia.id}/confirmar`, undefined, auth)
+  ok(estouro.status === 409 && pBia.status === 'PENDENTE', 'aprovar a segunda é barrado (409) e ela continua pendente', JSON.stringify(estouro.json))
+  ok((await req('GET', '/api/publico/campanha')).json[0].valorArrecadado === 1000, 'arrecadado para exatamente no valor total')
+  ok((await contribuir(10)).status === 409, 'item completo não aceita nova contribuição')
+  ok((await req('PATCH', `/api/campanha/contribuicoes/${pBia.id}/recusar`, { motivoRecusa: 'Item já completo' }, auth)).status === 200, 'a excedente pode ser recusada com motivo')
+  const reduzir = await req('PUT', '/api/campanha/itens/item1', { nome: 'Geladeira', valorTotal: 500, chavePix: 'pix', whatsappTesoureiro: '5583999990000' }, auth)
+  ok(reduzir.status === 400, 'valor total não pode ficar abaixo do arrecadado', JSON.stringify(reduzir.json))
 
   // 5. Mão Amiga pública: não estoura a meta
   tabelas.metaCesta = [{ id: '11111111-1111-4111-8111-111111111111', nomeItem: 'Arroz', unidade: 'kg', quantidadeNecessaria: 10, ativo: true }]

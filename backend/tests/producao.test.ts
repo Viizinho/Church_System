@@ -3,6 +3,7 @@ process.env.NODE_ENV = 'production'
 process.env.DATABASE_URL = 'postgres://teste'
 process.env.JWT_SECRET = 'a'.repeat(48)
 process.env.CORS_ORIGINS = 'https://app.exemplo.org'
+process.env.APP_URL = 'https://app.exemplo.org'
 process.env.FRONTEND_DIST = require('path').resolve(__dirname, '../../frontend/dist')
 
 import Module from 'module'

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import prisma from '../utils/prisma'
 import { AppError } from '../utils/AppError'
 import { emitirAtualizacaoCampanha, registrarClienteSSE } from '../utils/campanhaEvents'
@@ -41,13 +42,20 @@ async function somarArrecadadoPorItem(itemIds: string[]): Promise<Map<string, nu
 /** Limite de linhas por listagem administrativa (o histórico é paginado por data, mais recente primeiro). */
 const LIMITE_LISTAGEM = 500
 
-async function somarArrecadado(itemId: string): Promise<number> {
-  const result = await prisma.contribuicao.aggregate({
+type Cliente = Prisma.TransactionClient | typeof prisma
+
+async function somarArrecadado(itemId: string, cliente: Cliente = prisma): Promise<number> {
+  const result = await cliente.contribuicao.aggregate({
     where: { itemId, status: 'CONFIRMADO' },
     _sum: { valor: true },
   })
   return Number(result._sum.valor ?? 0)
 }
+
+// RN-05: o valor arrecadado (soma das contribuições confirmadas) nunca passa do valor total do item.
+// As comparações são feitas em centavos para não sofrer com arredondamento de ponto flutuante.
+const centavos = (valor: unknown): number => Math.round(Number(valor) * 100)
+const reais = (cent: number): string => (cent / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 export async function listarItens(_req: Request, res: Response) {
   const itens = await prisma.itemCampanha.findMany({
@@ -96,6 +104,10 @@ export async function atualizarItem(req: Request, res: Response) {
   if (!existente) throw new AppError('Item não encontrado.', 404)
 
   const dados = itemSchema.parse(req.body)
+  const arrecadado = centavos(await somarArrecadado(id))
+  if (centavos(dados.valorTotal) < arrecadado) {
+    throw new AppError(`O valor total não pode ser menor que o já arrecadado (${reais(arrecadado)}).`)
+  }
   const item = await prisma.itemCampanha.update({ where: { id }, data: dados })
   return res.json(item)
 }
@@ -140,23 +152,55 @@ export async function criarContribuicao(req: Request, res: Response) {
   if (!item || !item.ativo) throw new AppError('Item não encontrado ou inativo.', 404)
 
   const dados = contribuicaoSchema.parse(req.body)
+
+  // Pendentes não reservam valor (o Pix pode nem ter sido feito); a garantia final é na aprovação.
+  const restante = centavos(item.valorTotal) - centavos(await somarArrecadado(itemId))
+  if (restante <= 0) throw new AppError('Este item já atingiu o valor total. Escolha outro item.', 409)
+  if (centavos(dados.valor) > restante) {
+    throw new AppError(`Faltam ${reais(restante)} para completar este item. Ajuste o valor da contribuição.`)
+  }
+
   const contrib = await prisma.contribuicao.create({ data: { ...dados, itemId, valor: dados.valor } })
   return res.status(201).json(contrib)
 }
 
 export async function confirmarContribuicao(req: Request, res: Response) {
   const { id } = req.params
-  const contrib = await prisma.contribuicao.findUnique({ where: { id } })
-  if (!contrib) throw new AppError('Contribuição não encontrada.', 404)
 
-  // Condição no próprio UPDATE: se dois administradores clicarem ao mesmo tempo, só um vence.
-  const { count } = await prisma.contribuicao.updateMany({
-    where: { id, status: 'PENDENTE' },
-    data: { status: 'CONFIRMADO', confirmadoPor: req.usuarioId, confirmadoEm: new Date() },
-  })
-  if (count === 0) throw new AppError('Contribuição já processada.', 409)
+  // Serializable: duas aprovações ao mesmo tempo (de contribuições diferentes) não conseguem,
+  // juntas, passar do valor do item — a segunda transação falha (P2034) e o handler responde 409.
+  const atualizada = await prisma.$transaction(
+    async (tx) => {
+      const contrib = await tx.contribuicao.findUnique({ where: { id } })
+      if (!contrib) throw new AppError('Contribuição não encontrada.', 404)
+      if (contrib.status !== 'PENDENTE') throw new AppError('Contribuição já processada.', 409)
 
-  const atualizada = await prisma.contribuicao.findUniqueOrThrow({ where: { id } })
+      const item = await tx.itemCampanha.findUnique({ where: { id: contrib.itemId } })
+      if (!item) throw new AppError('Item não encontrado.', 404)
+
+      const restante = centavos(item.valorTotal) - centavos(await somarArrecadado(item.id, tx))
+      if (centavos(contrib.valor) > restante) {
+        throw new AppError(
+          restante <= 0
+            ? `"${item.nome}" já atingiu o valor total. Recuse esta contribuição informando o motivo.`
+            : `Aprovar esta contribuição passaria do valor de "${item.nome}": faltam só ${reais(restante)}. ` +
+              'Recuse-a informando o motivo ou aumente o valor total do item.',
+          409
+        )
+      }
+
+      // Condição no próprio UPDATE: se dois administradores clicarem ao mesmo tempo, só um vence.
+      const { count } = await tx.contribuicao.updateMany({
+        where: { id, status: 'PENDENTE' },
+        data: { status: 'CONFIRMADO', confirmadoPor: req.usuarioId, confirmadoEm: new Date() },
+      })
+      if (count === 0) throw new AppError('Contribuição já processada.', 409)
+
+      return tx.contribuicao.findUniqueOrThrow({ where: { id } })
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+  )
+
   emitirAtualizacaoCampanha(atualizada.itemId, await somarArrecadado(atualizada.itemId))
   return res.json(atualizada)
 }
