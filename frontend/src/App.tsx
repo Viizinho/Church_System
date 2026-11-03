@@ -14,6 +14,7 @@ const EsqueciSenhaPage = lazy(() => import('@/pages/EsqueciSenhaPage'))
 const RedefinirSenhaPage = lazy(() => import('@/pages/RedefinirSenhaPage'))
 const CampanhaPublicaPage = lazy(() => import('@/pages/CampanhaPublicaPage'))
 const MaoAmigaPublicaPage = lazy(() => import('@/pages/MaoAmigaPublicaPage'))
+const PrivacidadePage = lazy(() => import('@/pages/PrivacidadePage'))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const MembrosPage = lazy(() => import('@/pages/MembrosPage'))
 const AniversariosPage = lazy(() => import('@/pages/AniversariosPage'))
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
               <Route path="/contribuir" element={<CampanhaPublicaPage />} />
               <Route path="/doar" element={<MaoAmigaPublicaPage />} />
+              <Route path="/privacidade" element={<PrivacidadePage />} />
 
               {/* Admin — protegido por autenticação */}
               <Route
