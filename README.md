@@ -90,7 +90,8 @@ O relatório da última revisão (segurança, desempenho, código morto) está e
 
 ## Publicar na internet
 
-> Passo a passo no Railway (com banco, e-mail e criação do administrador): [docs/PUBLICAR-RAILWAY.md](./docs/PUBLICAR-RAILWAY.md).
+> **Gratuito (demonstração/TCC):** Render + Neon — [docs/PUBLICAR-GRATIS-RENDER-NEON.md](./docs/PUBLICAR-GRATIS-RENDER-NEON.md).
+> **Pago, sempre ligado:** Railway — [docs/PUBLICAR-RAILWAY.md](./docs/PUBLICAR-RAILWAY.md).
 
 A API serve o frontend compilado, então é **um serviço só** (sem CORS) + um PostgreSQL.
 

@@ -1,0 +1,24 @@
+# Blueprint do Render — publicação gratuita para demonstração e apresentação do TCC.
+# Passo a passo: docs/PUBLICAR-GRATIS-RENDER-NEON.md
+# O banco fica no Neon (gratuito e permanente); o Postgres gratuito do Render expira em 30 dias.
+services:
+  - type: web
+    name: igreja-gestao
+    runtime: docker
+    plan: free
+    region: virginia # mesma região do banco no Neon (AWS US East)
+    healthCheckPath: /ready
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL # conexão DIRETA do Neon (sem "-pooler"), com ?sslmode=require
+        sync: false
+      - key: BREVO_API_KEY # e-mail por API HTTPS (o Render gratuito bloqueia SMTP)
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
