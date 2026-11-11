@@ -125,6 +125,9 @@ export default function LandingPage() {
             <Lock size={14} /> Login ADM
           </Link>
         </div>
+        <p className="mt-6 text-xs text-gray-400">
+          <Link to="/privacidade" className="underline hover:text-gray-200">Aviso de privacidade (LGPD)</Link>
+        </p>
       </footer>
     </div>
   )

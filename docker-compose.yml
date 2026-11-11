@@ -1,6 +1,6 @@
 # Sobe tudo localmente (banco + aplicação):  docker compose up --build
 # Depois crie o administrador:
-#   docker compose run --rm app sh -c "ADMIN_EMAIL=voce@igreja.org ADMIN_PASSWORD='SenhaForte123' npx --prefix backend tsx backend/prisma/seed-admin.ts"
+#   docker compose run --rm app sh -c "ADMIN_EMAIL=voce@igreja.org ADMIN_PASSWORD='SenhaForte123' tsx backend/prisma/seed-admin.ts"
 services:
   db:
     image: postgres:16-alpine

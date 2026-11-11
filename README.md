@@ -90,9 +90,12 @@ O relatório da última revisão (segurança, desempenho, código morto) está e
 
 ## Publicar na internet
 
+> **Gratuito (demonstração/TCC):** Render + Neon — [docs/PUBLICAR-GRATIS-RENDER-NEON.md](./docs/PUBLICAR-GRATIS-RENDER-NEON.md).
+> **Pago, sempre ligado:** Railway — [docs/PUBLICAR-RAILWAY.md](./docs/PUBLICAR-RAILWAY.md).
+
 A API serve o frontend compilado, então é **um serviço só** (sem CORS) + um PostgreSQL.
 
-1. **Variáveis** (veja `backend/.env.example`): `DATABASE_URL`, `JWT_SECRET` (`openssl rand -hex 48`), `NODE_ENV=production`, `TRUST_PROXY=1` (Render/Railway/Nginx), `APP_URL` (endereço público em HTTPS) e `SMTP_HOST/PORT/USER/PASS/FROM` (e-mail, necessário para o "Esqueci minha senha"). O servidor **se recusa a subir** com segredo fraco ou `APP_URL` sem HTTPS.
+1. **Variáveis** (veja `backend/.env.example`): `DATABASE_URL`, `JWT_SECRET` (`openssl rand -hex 48`), `NODE_ENV=production`, `TRUST_PROXY=1` (Render/Railway/Nginx), `APP_URL` (endereço público em HTTPS) e e-mail para o "Esqueci minha senha" e os alertas: `BREVO_API_KEY` + `EMAIL_FROM` (API HTTPS, obrigatória no Railway Hobby, que bloqueia SMTP) ou `SMTP_HOST/PORT/USER/PASS/FROM`. O servidor **se recusa a subir** com segredo fraco ou `APP_URL` sem HTTPS.
 2. **Build e migração:** `npm ci && npm run build --workspace=frontend && npm run build --workspace=backend` e, no deploy, `npm run db:deploy --workspace=backend` (aplica migrações sem apagar dados).
 3. **Administrador (produção):** `ADMIN_EMAIL=... ADMIN_PASSWORD='...' npm run db:seed:admin --workspace=backend`. Os seeds de exemplo (`db:seed`, `db:seed:demo`) **recusam rodar** com `NODE_ENV=production`.
 4. **Iniciar:** `npm start` (ou use o `Dockerfile` / `docker-compose.yml` da raiz). Health checks: `/health` e `/ready` (confere o banco).

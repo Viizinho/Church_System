@@ -16,7 +16,8 @@ const schema = z.object({
   /** Liga/desliga o job diário de alertas (desligue em réplicas extras). */
   ENABLE_CRON: bool.default(true),
   /** Endereço público do sistema (usado no link do e-mail de recuperação de senha). */
-  APP_URL: z.string().url().default('http://localhost:5173'),
+  // No Render, RENDER_EXTERNAL_URL já traz o endereço público (https://<nome>.onrender.com).
+  APP_URL: z.string().url().default(process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173'),
   /** Pasta do build do frontend para servir junto com a API. */
   FRONTEND_DIST: z.string().optional(),
 })

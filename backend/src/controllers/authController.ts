@@ -6,7 +6,7 @@ import { z } from 'zod'
 import prisma from '../utils/prisma'
 import { AppError } from '../utils/AppError'
 import { env, isProd } from '../config/env'
-import { enviarEmail } from '../utils/notificacoes'
+import { emailConfigurado, enviarEmail } from '../utils/notificacoes'
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email('E-mail inválido.').max(254),
@@ -106,9 +106,9 @@ async function enviarLinkDeRecuperacao(email: string) {
   // O token vai no fragmento (#) da URL: não é enviado ao servidor nem aparece em logs ou no cabeçalho Referer.
   const link = `${env.APP_URL.replace(/\/$/, '')}/redefinir-senha#token=${token}`
 
-  if (isProd && !process.env.SMTP_HOST) {
-    // Sem SMTP em produção: nunca escreva o link nos logs (qualquer um com acesso aos logs tomaria a conta).
-    console.error('[recuperação de senha] SMTP_HOST não configurado: e-mail NÃO enviado.')
+  if (isProd && !emailConfigurado()) {
+    // Sem envio de e-mail em produção: nunca escreva o link nos logs (qualquer um com acesso aos logs tomaria a conta).
+    console.error('[recuperação de senha] e-mail não configurado (BREVO_API_KEY ou SMTP_HOST): link NÃO enviado.')
     return
   }
   await enviarEmail(

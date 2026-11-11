@@ -21,8 +21,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
-# Só dependências de execução do backend (+ prisma CLI para migrate deploy e tsx para o seed do admin)
-RUN npm ci --omit=dev --workspace=backend --include-workspace-root=false && npm install --no-save prisma@5 tsx --workspace=backend
+# Só dependências de execução do backend + prisma CLI (migrate deploy) + tsx global (seed do admin).
+# tsx vai global porque, com NODE_ENV=production, o npm ignora devDependencies e não o instalaria no workspace.
+RUN npm ci --omit=dev --workspace=backend --include-workspace-root=false \
+ && npm install --no-save prisma@5 --workspace=backend \
+ && npm install -g tsx@4 \
+ && npm cache clean --force
 COPY --from=build /app/backend/dist backend/dist
 COPY --from=build /app/backend/prisma backend/prisma
 COPY --from=build /app/frontend/dist frontend/dist
