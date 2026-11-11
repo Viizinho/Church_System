@@ -1,9 +1,9 @@
-export interface CriterioParadaData {
+export type CriterioParadaData = {
   tipo: 'DATA'
   valor: string // YYYY-MM-DD (último dia, inclusive)
 }
 
-export interface CriterioParadaOcorrencias {
+export type CriterioParadaOcorrencias = {
   tipo: 'OCORRENCIAS'
   valor: number
 }
