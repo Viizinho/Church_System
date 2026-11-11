@@ -17,16 +17,24 @@ export const REDES_FALLBACK = {
 }
 
 // Fotos da seção inicial da página pública (carrossel).
-// Para trocar: coloque as fotos reais em frontend/public/fotos/ com os mesmos nomes
-// (igreja-1.jpg … igreja-4.jpg) ou edite a lista abaixo. Dá para ter mais ou menos fotos.
-// Dicas: formato paisagem (ex.: 1600×1000 px), JPG com até ~300 KB cada, e um texto
-// alternativo (alt) que descreva a foto para quem usa leitor de tela.
-// As imagens atuais são ilustrações de exemplo.
+// As atuais são FOTOS DE EXEMPLO do Unsplash (licença Unsplash: uso livre, sem atribuição
+// obrigatória), carregadas direto do site deles. Substitua pelas fotos reais da igreja:
+//   1. coloque os arquivos em frontend/public/fotos/ (ex.: igreja-1.jpg);
+//   2. troque o src abaixo por '/fotos/igreja-1.jpg' (e assim por diante).
+// Dá para ter mais ou menos fotos. Dicas: formato paisagem (ex.: 1600×1000 px), JPG com até
+// ~300 KB cada, e um alt que descreva a foto para quem usa leitor de tela.
+// Fotos com pessoas: só de quem autorizou o uso da imagem.
+const unsplash = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1600&q=75`
+
 export const FOTOS_IGREJA: { src: string; alt: string; legenda?: string }[] = [
-  { src: '/fotos/igreja-1.jpg', alt: 'Fachada do templo da igreja ao entardecer', legenda: 'Nosso templo' },
-  { src: '/fotos/igreja-2.jpg', alt: 'Interior do templo com os bancos e o púlpito', legenda: 'Cultos' },
-  { src: '/fotos/igreja-3.jpg', alt: 'Grupo de louvor cantando no altar', legenda: 'Louvor' },
-  { src: '/fotos/igreja-4.jpg', alt: 'Cestas básicas do Projeto Mão Amiga sobre a mesa', legenda: 'Projeto Mão Amiga' },
+  // Kelly Sikkema — unsplash.com/photos/x8R7fCFbsHs
+  { src: unsplash('photo-1728939862879-a1f788974d2c'), alt: 'Pequena igreja branca com torre, cercada de árvores', legenda: 'Nosso templo' },
+  // Waldemar Brandt — unsplash.com/photos/FdhQi6engUg
+  { src: unsplash('photo-1642150607290-2c7195c98ce1'), alt: 'Interior de uma igreja com fileiras de bancos de madeira', legenda: 'Cultos' },
+  // Edward Cisneros — unsplash.com/photos/QSa-uv4WJ0k
+  { src: unsplash('photo-1507692049790-de58290a4334'), alt: 'Grupo de louvor ministrando no palco durante um culto', legenda: 'Louvor' },
+  // Joel Muniz — unsplash.com/photos/3k3l2brxmwQ
+  { src: unsplash('photo-1599059813005-11265ba4b4ce'), alt: 'Voluntários separando alimentos doados', legenda: 'Projeto Mão Amiga' },
 ]
 
 // Projeto Mão Amiga (página pública)
