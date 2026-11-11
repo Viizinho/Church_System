@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Church, Lock, MapPin } from 'lucide-react'
 import api from '@/services/api'
-import { IGREJA, REDES_FALLBACK } from '@/config/igreja'
+import { FOTOS_IGREJA, IGREJA, REDES_FALLBACK } from '@/config/igreja'
 import MenuDrawer from '@/components/public/MenuDrawer'
 import EventosPublicosSection from '@/components/public/EventosPublicosSection'
 import RedesSociaisSection from '@/components/public/RedesSociaisSection'
+import GaleriaFotos from '@/components/public/GaleriaFotos'
 import CampanhaPublicaPage from './CampanhaPublicaPage'
 import MaoAmigaPublicaPage from './MaoAmigaPublicaPage'
 
@@ -71,20 +72,11 @@ export default function LandingPage() {
         <MenuDrawer />
       </header>
 
-      <section className="px-4 py-16 md:py-24 text-center bg-gradient-to-br from-primary-600 to-primary-800 text-white">
-        <h1 className="text-3xl md:text-5xl font-bold">Bem-vindo(a) à nossa igreja</h1>
-        <p className="mt-4 max-w-2xl mx-auto text-primary-100">
-          {config?.sobre ?? 'Uma comunidade de fé, acolhimento e serviço.'}
-        </p>
-        <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-          <a href="#mao-amiga" className="px-6 py-3 rounded-xl bg-white text-primary-700 font-semibold hover:bg-primary-50 transition-colors">
-            Doar no Projeto Mão Amiga
-          </a>
-          <a href="#campanha" className="px-6 py-3 rounded-xl border border-white/60 text-white font-semibold hover:bg-white/10 transition-colors">
-            Contribuir com a Campanha
-          </a>
-        </div>
-      </section>
+      <GaleriaFotos
+        fotos={FOTOS_IGREJA}
+        titulo="Bem-vindo(a) à nossa igreja"
+        texto={config?.sobre ?? 'Uma comunidade de fé, acolhimento e serviço.'}
+      />
 
       <Secao
         id="redes-sociais"

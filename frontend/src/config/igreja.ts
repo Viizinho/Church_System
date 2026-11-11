@@ -16,6 +16,19 @@ export const REDES_FALLBACK = {
   whatsappContato: '5583999990010',
 }
 
+// Fotos da seção inicial da página pública (carrossel).
+// Para trocar: coloque as fotos reais em frontend/public/fotos/ com os mesmos nomes
+// (igreja-1.jpg … igreja-4.jpg) ou edite a lista abaixo. Dá para ter mais ou menos fotos.
+// Dicas: formato paisagem (ex.: 1600×1000 px), JPG com até ~300 KB cada, e um texto
+// alternativo (alt) que descreva a foto para quem usa leitor de tela.
+// As imagens atuais são ilustrações de exemplo.
+export const FOTOS_IGREJA: { src: string; alt: string; legenda?: string }[] = [
+  { src: '/fotos/igreja-1.jpg', alt: 'Fachada do templo da igreja ao entardecer', legenda: 'Nosso templo' },
+  { src: '/fotos/igreja-2.jpg', alt: 'Interior do templo com os bancos e o púlpito', legenda: 'Cultos' },
+  { src: '/fotos/igreja-3.jpg', alt: 'Grupo de louvor cantando no altar', legenda: 'Louvor' },
+  { src: '/fotos/igreja-4.jpg', alt: 'Cestas básicas do Projeto Mão Amiga sobre a mesa', legenda: 'Projeto Mão Amiga' },
+]
+
 // Projeto Mão Amiga (página pública)
 export const MAO_AMIGA = {
   chavePix: 'cesta.solidaria@gmail.com',
