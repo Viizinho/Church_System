@@ -80,9 +80,13 @@ Login de desenvolvimento: `admin@igreja.com` / `admin123`. Para uma apresentaç�
 
 ```bash
 npm run typecheck     # TypeScript (backend + frontend)
-npm test              # testes da API, recorrência de eventos, aniversários e modo produção (sem precisar de banco)
+npm test              # testes de unidade, de API e do frontend (sem precisar de banco)
+npm run test:cobertura # o mesmo, com relatório de cobertura
+npm run test:integracao # testes com PostgreSQL real (banco separado, ex.: igreja_teste)
 npm run audit:prod    # vulnerabilidades conhecidas nas dependências de produção
 ```
+
+Estratégia, como rodar e o que cada nível de teste cobre: [TESTES.md](./TESTES.md).
 
 **Esqueci minha senha:** o link chega por e-mail (30 min, uso único, token só em hash no banco, resposta igual exista ou não o e-mail, limites por IP e por conta; ao redefinir, as sessões abertas são encerradas). Em desenvolvimento, sem SMTP, o e-mail aparece no terminal da API.
 
