@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import 'dayjs/locale/pt-br'
-import { ChevronLeft, ChevronRight, MapPin, Repeat, Search } from 'lucide-react'
+import { MapPin, Plus, Repeat, Search } from 'lucide-react'
 import api from '@/services/api'
 import type { Evento, RegraRecorrencia, TipoEvento } from '@/types'
 import Button from '@/components/ui/Button'
@@ -13,7 +13,12 @@ import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Spinner from '@/components/ui/Spinner'
 import EmptyState from '@/components/ui/EmptyState'
+import OrdenacaoSelect from '@/components/ui/OrdenacaoSelect'
+import AlternarVisao, { useVisao } from '@/components/ui/AlternarVisao'
+import CalendarioMensal from '@/components/calendario/CalendarioMensal'
 import { DIAS_SEMANA, POSICOES_MES, descreverRecorrencia, posicaoNoMes } from '@/utils/recorrencia'
+import { compararData, compararTexto, ordenar, type OpcaoOrdenacao } from '@/utils/ordenacao'
+import { eventosNoCalendario, legendaEventos } from '@/utils/calendario'
 
 dayjs.locale('pt-br')
 
@@ -43,10 +48,37 @@ function modoDoEvento(e: Evento): Modo {
 
 const maiuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
+/** Abas da lista. "Esta semana" vai de domingo a sábado. */
+type Periodo = 'passados' | 'semana' | 'futuros'
+const PERIODOS: { chave: Periodo; label: string }[] = [
+  { chave: 'passados', label: 'Passados' },
+  { chave: 'semana', label: 'Esta semana' },
+  { chave: 'futuros', label: 'Futuros' },
+]
+/** Quantos eventos as abas Passados/Futuros trazem de uma vez */
+const LIMITE_ABA = 300
+
+type Ordem = 'data-asc' | 'data-desc' | 'nome' | 'tipo'
+const OPCOES_ORDEM: OpcaoOrdenacao<Ordem>[] = [
+  { valor: 'data-asc', label: 'Data (mais próxima primeiro)' },
+  { valor: 'data-desc', label: 'Data (mais distante primeiro)' },
+  { valor: 'nome', label: 'Nome (A–Z)' },
+  { valor: 'tipo', label: 'Tipo' },
+]
+const ordemPadrao = (p: Periodo): Ordem => (p === 'passados' ? 'data-desc' : 'data-asc')
+
+function intervaloSemana() {
+  const inicio = dayjs().startOf('week')
+  return { inicio, fim: inicio.add(1, 'week') }
+}
+
 export default function EventosPage() {
   const [eventos, setEventos] = useState<Evento[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
+  const [visao, setVisao] = useVisao('eventos')
+  const [periodo, setPeriodo] = useState<Periodo>('semana')
+  const [ordem, setOrdem] = useState<Ordem>('data-asc')
   const [mes, setMes] = useState(dayjs().startOf('month'))
   const [busca, setBusca] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<TipoEvento | ''>('')
@@ -77,14 +109,29 @@ export default function EventosPage() {
     setLoading(true)
     setErro('')
     try {
-      const r = await api.get('/eventos', { params: { mes: mes.month() + 1, ano: mes.year() } })
+      let params: Record<string, string | number>
+      if (visao === 'calendario') {
+        params = { mes: mes.month() + 1, ano: mes.year() }
+      } else {
+        const { inicio, fim } = intervaloSemana()
+        params =
+          periodo === 'semana' ? { de: inicio.toISOString(), ate: fim.toISOString() }
+          : periodo === 'futuros' ? { de: fim.toISOString(), ordem: 'asc', limite: LIMITE_ABA }
+          : { ate: inicio.toISOString(), ordem: 'desc', limite: LIMITE_ABA }
+      }
+      const r = await api.get('/eventos', { params })
       setEventos(r.data)
     } catch {
       setErro('Não foi possível carregar os eventos.')
     } finally {
       setLoading(false)
     }
-  }, [mes])
+  }, [visao, mes, periodo])
+
+  function mudarPeriodo(p: Periodo) {
+    setPeriodo(p)
+    setOrdem(ordemPadrao(p))
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -156,10 +203,10 @@ export default function EventosPage() {
     setDiaSemanaMes(regra?.diaSemanaMes ?? dia?.day() ?? 0)
   }
 
-  function openCreate() {
+  function openCreate(dia?: dayjs.Dayjs) {
     setEditing(null)
     setEscopoEdicao('ocorrencia')
-    setForm(FORM_VAZIO)
+    setForm(dia ? { ...FORM_VAZIO, inicio: dia.hour(19).minute(0).format('YYYY-MM-DDTHH:mm') } : FORM_VAZIO)
     resetarRegra()
     setErroForm('')
     setModal(true)
@@ -229,24 +276,75 @@ export default function EventosPage() {
     setExcluindo(e)
   }
 
-  // ── Lista filtrada e agrupada por dia
-  const grupos = useMemo(() => {
+  // ── Lista filtrada, ordenada e (quando por data) agrupada por dia
+  const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    const filtrados = eventos.filter(
+    return eventos.filter(
       (e) =>
         (!filtroTipo || e.tipo === filtroTipo) &&
         (!q || e.nome.toLowerCase().includes(q) || (e.local ?? '').toLowerCase().includes(q))
     )
+  }, [eventos, busca, filtroTipo])
+
+  const ordenados = useMemo(() => {
+    switch (ordem) {
+      case 'data-desc': return ordenar(filtrados, (a, b) => compararData(b.inicio, a.inicio))
+      case 'nome': return ordenar(filtrados, (a, b) => compararTexto(a.nome, b.nome) || compararData(a.inicio, b.inicio))
+      case 'tipo': return ordenar(filtrados, (a, b) => compararTexto(tipoLabel[a.tipo], tipoLabel[b.tipo]) || compararData(a.inicio, b.inicio))
+      default: return ordenar(filtrados, (a, b) => compararData(a.inicio, b.inicio))
+    }
+  }, [filtrados, ordem])
+
+  const porData = ordem === 'data-asc' || ordem === 'data-desc'
+  const dias = useMemo(() => {
     const mapa = new Map<string, Evento[]>()
-    for (const e of filtrados) {
+    for (const e of ordenados) {
       const chave = dayjs(e.inicio).format('YYYY-MM-DD')
       mapa.set(chave, [...(mapa.get(chave) ?? []), e])
     }
-    return { total: filtrados.length, dias: [...mapa.entries()] }
-  }, [eventos, busca, filtroTipo])
+    // dentro do dia, sempre pelo horário
+    for (const lista of mapa.values()) lista.sort((a, b) => compararData(a.inicio, b.inicio))
+    return [...mapa.entries()]
+  }, [ordenados])
+
+  const itensCalendario = useMemo(() => eventosNoCalendario(filtrados, openEdit), [filtrados])
 
   const hoje = dayjs().format('YYYY-MM-DD')
   const agora = dayjs()
+  const semanaAtual = intervaloSemana()
+  const textoSemana = `${semanaAtual.inicio.format('DD/MM')} a ${semanaAtual.fim.subtract(1, 'day').format('DD/MM')}`
+  const textoVazio =
+    eventos.length > 0 ? 'Nenhum evento corresponde aos filtros'
+    : periodo === 'semana' ? 'Nenhum evento nesta semana'
+    : periodo === 'futuros' ? 'Nenhum evento futuro cadastrado'
+    : 'Nenhum evento passado'
+
+  function LinhaEvento({ e, mostrarData }: { e: Evento; mostrarData?: boolean }) {
+    const d = dayjs(e.inicio)
+    const passou = d.isBefore(agora)
+    const serie = e.serieId ? descreverRecorrencia(e.recorrenciaSerie, e.regraSerie, d.date()) : null
+    return (
+      <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${passou ? 'opacity-60' : ''}`}>
+        <div className={`${mostrarData ? 'w-20' : 'w-14'} text-center flex-shrink-0`}>
+          {mostrarData && <p className="text-[11px] uppercase text-gray-500 leading-tight">{d.format('ddd DD/MM')}</p>}
+          <p className="text-base font-bold text-primary-600 leading-none">{d.format('HH:mm')}</p>
+        </div>
+        <div className="flex-1 min-w-[180px]">
+          <p className="text-sm font-semibold text-gray-900">{e.nome}</p>
+          <p className="text-xs text-gray-500 flex flex-wrap items-center gap-x-3">
+            {e.local && <span className="inline-flex items-center gap-1"><MapPin size={11} />{e.local}</span>}
+            {serie && <span className="inline-flex items-center gap-1 text-primary-600"><Repeat size={11} />{serie}</span>}
+          </p>
+        </div>
+        <Badge variant={tipoVariant[e.tipo]}>{tipoLabel[e.tipo]}</Badge>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" onClick={() => openEdit(e)}>Editar</Button>
+          <Button variant="ghost" size="sm" onClick={() => pedirExclusao(e)} className="text-red-500 hover:bg-red-50">Remover</Button>
+        </div>
+      </div>
+    )
+  }
+
   const diaDoMesInicio = inicioDayjs?.date()
 
   const resumoForm = repete
@@ -255,30 +353,28 @@ export default function EventosPage() {
 
   return (
     <div className="p-4 sm:p-6 2xl:px-10">
-      <PageHeader title="Eventos" subtitle="Agenda da igreja, com cultos e reuniões que se repetem" actions={<Button onClick={openCreate}>+ Novo evento</Button>} />
+      <PageHeader title="Eventos" subtitle="Agenda da igreja, com cultos e reuniões que se repetem" actions={<Button onClick={() => openCreate()}>+ Novo evento</Button>} />
 
-      {/* Navegação de mês + filtros */}
+      {/* Visão + filtros */}
       <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" aria-label="Mês anterior" onClick={() => setMes((m) => m.subtract(1, 'month'))}><ChevronLeft size={16} /></Button>
-          <span className="w-40 text-center text-sm font-semibold text-gray-900">{maiuscula(mes.format('MMMM [de] YYYY'))}</span>
-          <Button variant="ghost" size="sm" aria-label="Próximo mês" onClick={() => setMes((m) => m.add(1, 'month'))}><ChevronRight size={16} /></Button>
-          <Button variant="secondary" size="sm" onClick={() => setMes(dayjs().startOf('month'))} disabled={mes.isSame(dayjs(), 'month')}>Hoje</Button>
-        </div>
+        <AlternarVisao value={visao} onChange={setVisao} />
         <div className="relative flex-1 min-w-[180px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
+            type="search"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por nome ou local"
+            aria-label="Buscar eventos"
             className="w-full h-9 rounded-lg border border-gray-300 pl-9 pr-3 text-sm outline-none focus:border-primary-500"
           />
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5" role="group" aria-label="Tipo de evento">
           {(['', 'CULTO', 'REUNIAO', 'ESPECIAL'] as const).map((t) => (
             <button
               key={t || 'todos'}
               type="button"
+              aria-pressed={filtroTipo === t}
               onClick={() => setFiltroTipo(t)}
               className={`px-3 h-8 rounded-full text-xs font-medium border transition-colors ${
                 filtroTipo === t ? 'bg-primary-500 border-primary-500 text-white' : 'bg-white border-gray-300 text-gray-600 hover:border-primary-400'
@@ -288,54 +384,77 @@ export default function EventosPage() {
             </button>
           ))}
         </div>
+        {visao === 'lista' && <OrdenacaoSelect value={ordem} onChange={setOrdem} opcoes={OPCOES_ORDEM} />}
       </div>
 
       {erro && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}
 
-      {loading ? <Spinner /> : grupos.total === 0 ? (
-        <EmptyState message={eventos.length === 0 ? 'Nenhum evento neste mês' : 'Nenhum evento corresponde aos filtros'} icon="📅" />
+      {visao === 'calendario' ? (
+        <CalendarioMensal
+          mes={mes}
+          onMudarMes={setMes}
+          itens={itensCalendario}
+          carregando={loading}
+          legenda={legendaEventos}
+          vazioDia="Nenhum evento neste dia."
+          acoesDia={(dia) => (
+            <Button size="sm" variant="secondary" onClick={() => openCreate(dia)}><Plus size={14} aria-hidden /> Novo evento neste dia</Button>
+          )}
+        />
       ) : (
         <>
-          <p className="text-xs text-gray-500 mb-3">{grupos.total} {grupos.total === 1 ? 'evento' : 'eventos'} neste mês</p>
-          <div className="space-y-4">
-            {grupos.dias.map(([dia, lista]) => {
-              const d = dayjs(dia)
-              const ehHoje = dia === hoje
-              return (
-                <section key={dia}>
-                  <h2 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${ehHoje ? 'text-primary-600' : 'text-gray-500'}`}>
-                    {maiuscula(d.format('dddd'))}, {d.format('DD [de] MMMM')}
-                    {ehHoje && <span className="ml-2 normal-case bg-primary-500 text-white rounded-full px-2 py-0.5">Hoje</span>}
-                  </h2>
-                  <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
-                    {lista.map((e) => {
-                      const passou = dayjs(e.inicio).isBefore(agora)
-                      const serie = e.serieId ? descreverRecorrencia(e.recorrenciaSerie, e.regraSerie, dayjs(e.inicio).date()) : null
-                      return (
-                        <div key={e.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${passou ? 'opacity-60' : ''}`}>
-                          <div className="w-14 text-center flex-shrink-0">
-                            <p className="text-base font-bold text-primary-600 leading-none">{dayjs(e.inicio).format('HH:mm')}</p>
-                          </div>
-                          <div className="flex-1 min-w-[180px]">
-                            <p className="text-sm font-semibold text-gray-900">{e.nome}</p>
-                            <p className="text-xs text-gray-500 flex flex-wrap items-center gap-x-3">
-                              {e.local && <span className="inline-flex items-center gap-1"><MapPin size={11} />{e.local}</span>}
-                              {serie && <span className="inline-flex items-center gap-1 text-primary-600"><Repeat size={11} />{serie}</span>}
-                            </p>
-                          </div>
-                          <Badge variant={tipoVariant[e.tipo]}>{tipoLabel[e.tipo]}</Badge>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(e)}>Editar</Button>
-                            <Button variant="ghost" size="sm" onClick={() => pedirExclusao(e)} className="text-red-500 hover:bg-red-50">Remover</Button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </section>
-              )
-            })}
+          {/* Abas: passados / esta semana / futuros */}
+          <div className="flex gap-1 border-b border-gray-200 mb-4" role="tablist" aria-label="Período">
+            {PERIODOS.map((p) => (
+              <button
+                key={p.chave}
+                role="tab"
+                aria-selected={periodo === p.chave}
+                onClick={() => mudarPeriodo(p.chave)}
+                className={`px-3 py-2 text-sm -mb-px border-b-2 transition-colors ${
+                  periodo === p.chave ? 'border-primary-500 text-primary-600 font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {p.label}
+                {p.chave === 'semana' && <span className="ml-1 text-xs text-gray-400">({textoSemana})</span>}
+              </button>
+            ))}
           </div>
+
+          {loading ? <Spinner /> : ordenados.length === 0 ? (
+            <EmptyState message={textoVazio} icon="📅" />
+          ) : (
+            <>
+              <p className="text-xs text-gray-500 mb-3">
+                {ordenados.length} {ordenados.length === 1 ? 'evento' : 'eventos'}
+                {periodo === 'semana' ? ' nesta semana' : periodo === 'futuros' ? ' a partir da próxima semana' : ' antes desta semana'}
+                {eventos.length >= LIMITE_ABA && periodo !== 'semana' && ` (mostrando os ${LIMITE_ABA} mais próximos de hoje)`}
+              </p>
+              {porData ? (
+                <div className="space-y-4">
+                  {dias.map(([dia, lista]) => {
+                    const d = dayjs(dia)
+                    const ehHoje = dia === hoje
+                    return (
+                      <section key={dia}>
+                        <h2 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${ehHoje ? 'text-primary-600' : 'text-gray-500'}`}>
+                          {maiuscula(d.format('dddd'))}, {d.format(d.isSame(agora, 'year') ? 'DD [de] MMMM' : 'DD [de] MMMM [de] YYYY')}
+                          {ehHoje && <span className="ml-2 normal-case bg-primary-500 text-white rounded-full px-2 py-0.5">Hoje</span>}
+                        </h2>
+                        <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+                          {lista.map((e) => <LinhaEvento key={e.id} e={e} />)}
+                        </div>
+                      </section>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+                  {ordenados.map((e) => <LinhaEvento key={e.id} e={e} mostrarData />)}
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 

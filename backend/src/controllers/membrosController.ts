@@ -173,7 +173,7 @@ export async function remover(req: Request, res: Response) {
 }
 
 export async function aniversariantes(req: Request, res: Response) {
-  const { periodo } = req.query // 'semana' | 'mes'
+  const { periodo } = req.query // 'semana' | 'mes' | 'todos' (calendário: todos os ativos com data de nascimento)
 
   const membros = await prisma.membro.findMany({
     where: { status: 'ATIVO', dataNascimento: { not: null } },
@@ -192,7 +192,7 @@ export async function aniversariantes(req: Request, res: Response) {
       const nasc = m.dataNascimento!
       return { ...m, diffDias: diasAteAniversario(nasc), proximoAniversario: proximoAniversario(nasc) }
     })
-    .filter((m) => (periodo === 'mes' ? m.diffDias <= 30 : m.diffDias <= 7))
+    .filter((m) => (periodo === 'todos' ? true : periodo === 'mes' ? m.diffDias <= 30 : m.diffDias <= 7))
     .sort((a, b) => a.diffDias - b.diffDias)
 
   return res.json(comAniversario)

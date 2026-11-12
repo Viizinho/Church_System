@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search } from 'lucide-react'
 import api from '@/services/api'
 import type { DoacaoAlimento, Membro, StatusDoacao } from '@/types'
 import Button from '@/components/ui/Button'
@@ -10,6 +11,8 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import Spinner from '@/components/ui/Spinner'
 import PageHeader from '@/components/ui/PageHeader'
 import dayjs from 'dayjs'
+import OrdenacaoSelect from '@/components/ui/OrdenacaoSelect'
+import { compararData, compararTexto, ordenar, type OpcaoOrdenacao } from '@/utils/ordenacao'
 
 interface MetaCesta {
   id: string
@@ -19,9 +22,20 @@ interface MetaCesta {
   completo: boolean
 }
 
+type Ordem = 'recentes' | 'antigas' | 'doador' | 'item'
+const OPCOES_ORDEM: OpcaoOrdenacao<Ordem>[] = [
+  { valor: 'recentes', label: 'Mais recentes primeiro' },
+  { valor: 'antigas', label: 'Mais antigas primeiro' },
+  { valor: 'doador', label: 'Doador (A–Z)' },
+  { valor: 'item', label: 'Item doado (A–Z)' },
+]
+
 export default function MaoAmigaAdminPage() {
   const [doacoes, setDoacoes] = useState<DoacaoAlimento[]>([])
   const [aba, setAba] = useState<StatusDoacao>('PENDENTE')
+  const [busca, setBusca] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState<'' | 'FISICA' | 'PIX'>('')
+  const [ordem, setOrdem] = useState<Ordem>('recentes')
   const [aprovando, setAprovando] = useState<DoacaoAlimento | null>(null)
   const [recusando, setRecusando] = useState<DoacaoAlimento | null>(null)
   const [motivo, setMotivo] = useState('')
@@ -127,8 +141,21 @@ export default function MaoAmigaAdminPage() {
     { chave: 'RECUSADO', label: 'Recusadas' },
   ]
   const contagem = (st: StatusDoacao) => doacoes.filter((d) => d.status === st).length
-  const listaAba = doacoes.filter((d) => d.status === aba)
   const nomeDoador = (d: DoacaoAlimento) => d.membro?.nomeCompleto ?? d.nomeDoador ?? 'Doador anônimo'
+  const listaAba = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    const lista = doacoes.filter(
+      (d) => d.status === aba && (!filtroTipo || d.tipo === filtroTipo) &&
+        (!q || nomeDoador(d).toLowerCase().includes(q) || d.itemDoado.toLowerCase().includes(q))
+    )
+    switch (ordem) {
+      case 'antigas': return ordenar(lista, (a, b) => compararData(a.criadoEm, b.criadoEm))
+      case 'doador': return ordenar(lista, (a, b) => compararTexto(nomeDoador(a), nomeDoador(b)))
+      case 'item': return ordenar(lista, (a, b) => compararTexto(a.itemDoado, b.itemDoado))
+      default: return ordenar(lista, (a, b) => compararData(b.criadoEm, a.criadoEm))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doacoes, aba, busca, filtroTipo, ordem])
   const descricao = (d: DoacaoAlimento) => (d.quantidade !== '—' ? `${d.itemDoado} (${d.quantidade})` : d.itemDoado)
 
   if (loading) return <Spinner />
@@ -165,9 +192,34 @@ export default function MaoAmigaAdminPage() {
           ))}
         </div>
 
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar doador ou item"
+              aria-label="Buscar doações"
+              className="w-full h-9 rounded-lg border border-gray-300 pl-9 pr-3 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+          <select
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value as '' | 'FISICA' | 'PIX')}
+            aria-label="Filtrar por tipo de doação"
+            className="h-9 rounded-lg border border-gray-300 bg-white px-2.5 text-sm text-gray-700 outline-none focus:border-primary-500"
+          >
+            <option value="">Física e Pix</option>
+            <option value="FISICA">Só física</option>
+            <option value="PIX">Só Pix</option>
+          </select>
+          <OrdenacaoSelect value={ordem} onChange={setOrdem} opcoes={OPCOES_ORDEM} />
+        </div>
+
         {listaAba.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">
-            {aba === 'PENDENTE' ? 'Nenhum envio aguardando aprovação.' : 'Nada por aqui ainda.'}
+            {busca || filtroTipo ? 'Nenhuma doação corresponde aos filtros.' : aba === 'PENDENTE' ? 'Nenhum envio aguardando aprovação.' : 'Nada por aqui ainda.'}
           </p>
         ) : (
           <div className="space-y-2">

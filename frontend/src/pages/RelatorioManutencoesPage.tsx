@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '@/services/api'
 import type { AtivoRelatorio, Manutencao } from '@/types'
@@ -12,9 +12,25 @@ import Spinner from '@/components/ui/Spinner'
 import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
 import { formatarData, paraInputData } from '@/utils/data'
+import OrdenacaoSelect from '@/components/ui/OrdenacaoSelect'
+import { URGENCIA, compararData, compararTexto, ordenar, type OpcaoOrdenacao } from '@/utils/ordenacao'
 
 const statusVariant = { VENCIDO: 'red', PROXIMO: 'amber', SEM_REGISTRO: 'gray', EM_DIA: 'green' } as const
 const statusLabel = { VENCIDO: 'Vencido', PROXIMO: 'Próximo', SEM_REGISTRO: 'Sem registro', EM_DIA: 'Em dia' } as const
+
+type OrdemAtivos = 'nome' | 'urgencia' | 'ultima' | 'quantidade'
+const OPCOES_ATIVOS: OpcaoOrdenacao<OrdemAtivos>[] = [
+  { valor: 'nome', label: 'Nome (A–Z)' },
+  { valor: 'urgencia', label: 'Mais urgentes primeiro' },
+  { valor: 'ultima', label: 'Última manutenção (recente)' },
+  { valor: 'quantidade', label: 'Mais manutenções' },
+]
+type OrdemManut = 'recentes' | 'antigas' | 'responsavel'
+const OPCOES_MANUT: OpcaoOrdenacao<OrdemManut>[] = [
+  { valor: 'recentes', label: 'Mais recentes primeiro' },
+  { valor: 'antigas', label: 'Mais antigas primeiro' },
+  { valor: 'responsavel', label: 'Responsável (A–Z)' },
+]
 
 interface Alvo {
   manutencao: Manutencao
@@ -29,6 +45,8 @@ export default function RelatorioManutencoesPage() {
   const [filtroAtivo, setFiltroAtivo] = useState('')
   const [de, setDe] = useState('')
   const [ate, setAte] = useState('')
+  const [ordemAtivos, setOrdemAtivos] = useState<OrdemAtivos>('nome')
+  const [ordemManut, setOrdemManut] = useState<OrdemManut>('recentes')
 
   const [editando, setEditando] = useState<Alvo | null>(null)
   const [form, setForm] = useState({ data: '', descricao: '', responsavel: '' })
@@ -47,7 +65,7 @@ export default function RelatorioManutencoesPage() {
       })
       setAtivos(r.data)
     } catch {
-      setErro('Não foi possível carregar o relatório.')
+      setErro('Não foi possível carregar o histórico.')
     } finally {
       setLoading(false)
     }
@@ -61,6 +79,20 @@ export default function RelatorioManutencoesPage() {
   }, [])
 
   const totalRegistros = ativos.reduce((acc, a) => acc + a.manutencoes.length, 0)
+
+  const ordenados = useMemo(() => {
+    const cmpManut = (x: Manutencao, y: Manutencao) =>
+      ordemManut === 'antigas' ? compararData(x.data, y.data)
+      : ordemManut === 'responsavel' ? compararTexto(x.responsavel, y.responsavel) || compararData(y.data, x.data)
+      : compararData(y.data, x.data)
+    const comManut = ativos.map((a) => ({ ...a, manutencoes: ordenar(a.manutencoes, cmpManut) }))
+    switch (ordemAtivos) {
+      case 'urgencia': return ordenar(comManut, (a, b) => (URGENCIA[a.status] ?? 9) - (URGENCIA[b.status] ?? 9) || compararTexto(a.nome, b.nome))
+      case 'ultima': return ordenar(comManut, (a, b) => compararData(b.ultimaManutencao, a.ultimaManutencao) || compararTexto(a.nome, b.nome))
+      case 'quantidade': return ordenar(comManut, (a, b) => b.manutencoes.length - a.manutencoes.length || compararTexto(a.nome, b.nome))
+      default: return ordenar(comManut, (a, b) => compararTexto(a.nome, b.nome))
+    }
+  }, [ativos, ordemAtivos, ordemManut])
 
   function abrirEdicao(alvo: Alvo) {
     setForm({
@@ -110,7 +142,7 @@ export default function RelatorioManutencoesPage() {
   return (
     <div className="p-4 sm:p-6 2xl:px-10">
       <PageHeader
-        title="Relatório de manutenções"
+        title="Histórico de manutenções"
         subtitle="Todas as manutenções realizadas, agrupadas por ativo"
         actions={<Link to="/manutencao"><Button variant="secondary">← Voltar aos ativos</Button></Link>}
       />
@@ -129,6 +161,10 @@ export default function RelatorioManutencoesPage() {
         >
           Limpar filtros
         </Button>
+        <div className="sm:col-span-4 flex flex-wrap gap-4 pt-1 border-t border-gray-100">
+          <OrdenacaoSelect rotulo="Ordenar ativos" value={ordemAtivos} onChange={setOrdemAtivos} opcoes={OPCOES_ATIVOS} />
+          <OrdenacaoSelect rotulo="Manutenções" value={ordemManut} onChange={setOrdemManut} opcoes={OPCOES_MANUT} />
+        </div>
       </div>
 
       {erro && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>}
@@ -141,7 +177,7 @@ export default function RelatorioManutencoesPage() {
             {ativos.length} {ativos.length === 1 ? 'ativo' : 'ativos'} · {totalRegistros} {totalRegistros === 1 ? 'manutenção' : 'manutenções'}
           </p>
           <div className="space-y-4">
-            {ativos.map((a) => (
+            {ordenados.map((a) => (
               <section key={a.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
                   <div>

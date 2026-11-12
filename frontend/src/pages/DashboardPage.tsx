@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { CalendarDays, Cake, Gift, HeartHandshake, Users, Wrench } from 'lucide-react'
 import api from '@/services/api'
-import type { DashboardData } from '@/types'
+import type { DashboardData, Evento, Membro } from '@/types'
 import Card, { CardBody, CardHeader } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
 import PageHeader from '@/components/ui/PageHeader'
+import CalendarioMensal from '@/components/calendario/CalendarioMensal'
+import { aniversariosNoCalendario, eventosNoCalendario, legendaEventos } from '@/utils/calendario'
 import dayjs from 'dayjs'
 import 'dayjs/locale/pt-br'
 dayjs.locale('pt-br')
@@ -27,10 +29,33 @@ function statusManutLabel(s: string) {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [erro, setErro] = useState(false)
+  const navigate = useNavigate()
+
+  // Calendário do mês: eventos do mês exibido + aniversários (todos os ativos, carregados uma vez)
+  const [mesCal, setMesCal] = useState(dayjs().startOf('month'))
+  const [eventosMes, setEventosMes] = useState<Evento[]>([])
+  const [carregandoCal, setCarregandoCal] = useState(true)
+  const [nascimentos, setNascimentos] = useState<Membro[]>([])
 
   useEffect(() => {
     api.get('/dashboard').then((r) => setData(r.data)).catch(() => setErro(true))
+    api.get('/membros/aniversariantes', { params: { periodo: 'todos' } }).then((r) => setNascimentos(r.data)).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    let ativo = true
+    setCarregandoCal(true)
+    api.get('/eventos', { params: { mes: mesCal.month() + 1, ano: mesCal.year() } })
+      .then((r) => { if (ativo) setEventosMes(r.data) })
+      .catch(() => { if (ativo) setEventosMes([]) })
+      .finally(() => { if (ativo) setCarregandoCal(false) })
+    return () => { ativo = false }
+  }, [mesCal])
+
+  const itensCalendario = useMemo(
+    () => [...eventosNoCalendario(eventosMes, () => navigate('/eventos')), ...aniversariosNoCalendario(nascimentos, mesCal)],
+    [eventosMes, nascimentos, mesCal, navigate]
+  )
 
   if (erro) return <div className="p-6"><p role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">Não foi possível carregar o painel. Recarregue a página.</p></div>
   if (!data) return <Spinner />
@@ -111,8 +136,28 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      {/* Calendário do mês */}
+      <Card className="xl:col-span-2">
+        <CardHeader>
+          <span className="text-sm font-semibold text-gray-900">Calendário</span>
+          <Link to="/eventos" className="text-xs font-medium text-primary-600 hover:underline">Abrir agenda</Link>
+        </CardHeader>
+        <CardBody>
+          <CalendarioMensal
+            mes={mesCal}
+            onMudarMes={setMesCal}
+            itens={itensCalendario}
+            carregando={carregandoCal}
+            compacto
+            legenda={[...legendaEventos, { cor: 'pink', texto: 'Aniversário' }]}
+            vazioDia="Nenhum evento ou aniversário neste dia."
+          />
+        </CardBody>
+      </Card>
+
       {/* Próximos eventos */}
-      <Card>
+      <Card className="self-start">
         <CardHeader><span className="text-sm font-semibold text-gray-900">Próximos eventos</span></CardHeader>
         <CardBody className="divide-y divide-gray-50">
           {data.eventosProximos.length === 0
@@ -135,6 +180,7 @@ export default function DashboardPage() {
           }
         </CardBody>
       </Card>
+      </div>
     </div>
   )
 }

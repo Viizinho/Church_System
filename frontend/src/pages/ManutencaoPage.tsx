@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ClipboardList } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { History, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import api from '@/services/api'
 import type { Ativo, Manutencao } from '@/types'
@@ -12,9 +12,20 @@ import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
 import dayjs from 'dayjs'
 import { formatarData } from '@/utils/data'
+import OrdenacaoSelect from '@/components/ui/OrdenacaoSelect'
+import { URGENCIA, compararData, compararTexto, ordenar, type OpcaoOrdenacao } from '@/utils/ordenacao'
 
 function statusVariant(s: string) { return { VENCIDO: 'red', PROXIMO: 'amber', SEM_REGISTRO: 'gray', EM_DIA: 'green' }[s] as any }
 function statusLabel(s: string) { return { VENCIDO: 'Vencido', PROXIMO: 'Próximo', SEM_REGISTRO: 'Sem registro', EM_DIA: 'Em dia' }[s] ?? s }
+
+
+type Ordem = 'urgencia' | 'proxima' | 'ultima' | 'nome'
+const OPCOES_ORDEM: OpcaoOrdenacao<Ordem>[] = [
+  { valor: 'urgencia', label: 'Mais urgentes primeiro' },
+  { valor: 'proxima', label: 'Próxima manutenção' },
+  { valor: 'ultima', label: 'Última manutenção (recente)' },
+  { valor: 'nome', label: 'Nome (A–Z)' },
+]
 
 export default function ManutencaoPage() {
   const [ativos, setAtivos] = useState<Ativo[]>([])
@@ -26,6 +37,9 @@ export default function ManutencaoPage() {
   const [formManut, setFormManut] = useState({ data: dayjs().format('YYYY-MM-DD'), descricao: '', responsavel: '' })
   const [saving, setSaving] = useState(false)
   const [historico, setHistorico] = useState<Manutencao[]>([])
+  const [busca, setBusca] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState('')
+  const [ordem, setOrdem] = useState<Ordem>('urgencia')
 
   async function load() {
     setLoading(true)
@@ -80,18 +94,60 @@ export default function ManutencaoPage() {
     load()
   }
 
+  const visiveis = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    const lista = ativos.filter(
+      (a) => (!filtroStatus || a.status === filtroStatus) && (!q || a.nome.toLowerCase().includes(q) || (a.descricao ?? '').toLowerCase().includes(q))
+    )
+    switch (ordem) {
+      case 'nome': return ordenar(lista, (a, b) => compararTexto(a.nome, b.nome))
+      case 'proxima': return ordenar(lista, (a, b) => compararData(a.proximaManutencao, b.proximaManutencao) || compararTexto(a.nome, b.nome))
+      case 'ultima': return ordenar(lista, (a, b) => compararData(b.ultimaManutencao?.data, a.ultimaManutencao?.data) || compararTexto(a.nome, b.nome))
+      default: return ordenar(lista, (a, b) => (URGENCIA[a.status] ?? 9) - (URGENCIA[b.status] ?? 9) || compararData(a.proximaManutencao, b.proximaManutencao) || compararTexto(a.nome, b.nome))
+    }
+  }, [ativos, busca, filtroStatus, ordem])
+
   return (
     <div className="p-4 sm:p-6 2xl:px-10">
       <PageHeader
         title="Manutenção"
         subtitle="Controle de ativos da igreja"
         actions={<>
-          <Link to="/manutencao/relatorio"><Button variant="secondary"><ClipboardList size={15} aria-hidden /> Relatório por ativo</Button></Link>
+          <Link to="/manutencao/relatorio"><Button variant="secondary"><History size={15} aria-hidden /> Histórico de manutenções</Button></Link>
           <Button onClick={openCreateAtivo}>+ Novo ativo</Button>
         </>}
       />
 
-      {loading ? <Spinner /> : ativos.length === 0 ? <EmptyState message="Nenhum ativo cadastrado" icon="🔧" /> : (
+      {!loading && ativos.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar ativo"
+              aria-label="Buscar ativo"
+              className="w-full h-9 rounded-lg border border-gray-300 pl-9 pr-3 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+          <select
+            value={filtroStatus}
+            onChange={(e) => setFiltroStatus(e.target.value)}
+            aria-label="Filtrar por situação"
+            className="h-9 rounded-lg border border-gray-300 bg-white px-2.5 text-sm text-gray-700 outline-none focus:border-primary-500"
+          >
+            <option value="">Todas as situações</option>
+            <option value="VENCIDO">Vencido</option>
+            <option value="SEM_REGISTRO">Sem registro</option>
+            <option value="PROXIMO">Próximo</option>
+            <option value="EM_DIA">Em dia</option>
+          </select>
+          <OrdenacaoSelect value={ordem} onChange={setOrdem} opcoes={OPCOES_ORDEM} />
+        </div>
+      )}
+
+      {loading ? <Spinner /> : ativos.length === 0 ? <EmptyState message="Nenhum ativo cadastrado" icon="🔧" /> : visiveis.length === 0 ? <EmptyState message="Nenhum ativo corresponde aos filtros" icon="🔍" /> : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -100,7 +156,7 @@ export default function ManutencaoPage() {
               ))}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {ativos.map((a) => (
+              {visiveis.map((a) => (
                 <tr key={a.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{a.nome}</td>
                   <td className="px-4 py-3 text-gray-600">a cada {a.periodicidadeDias} dias</td>

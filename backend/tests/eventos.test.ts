@@ -1,12 +1,12 @@
 import Module from 'module'
 let seq=0
 const rows:any[]=[]
-const match=(r:any,w:any):boolean=>!w||Object.entries(w).every(([k,v]:any)=>k==='OR'?v.some((x:any)=>match(r,x)):(v&&typeof v==='object'&&!(v instanceof Date)?(('gte' in v?r[k]>=v.gte:true)&&('lte' in v?r[k]<=v.lte:true)):r[k]===v))
+const match=(r:any,w:any):boolean=>!w||Object.entries(w).every(([k,v]:any)=>k==='OR'?v.some((x:any)=>match(r,x)):(v&&typeof v==='object'&&!(v instanceof Date)?(('gte' in v?r[k]>=v.gte:true)&&('lte' in v?r[k]<=v.lte:true)&&('lt' in v?r[k]<v.lt:true)):r[k]===v))
 const evento={
   create:async({data}:any)=>{const r={id:'e'+(++seq),eventoPaiId:null,regraRecorrencia:null,...data};rows.push(r);return r},
   createMany:async({data}:any)=>{data.forEach((d:any)=>rows.push({id:'e'+(++seq),eventoPaiId:null,regraRecorrencia:null,...d}));return{count:data.length}},
   findUnique:async({where,include}:any)=>{const r=rows.find(x=>x.id===where.id);if(!r)return null;return include?{...r,eventoPai:r.eventoPaiId?rows.find(x=>x.id===r.eventoPaiId):null}:r},
-  findMany:async({where,include}:any={})=>rows.filter(r=>match(r,where)).sort((a,b)=>a.inicio-b.inicio).map(r=>include?{...r,eventoPai:r.eventoPaiId?rows.find(x=>x.id===r.eventoPaiId):null}:r),
+  findMany:async({where,include,orderBy,take}:any={})=>rows.filter(r=>match(r,where)).sort((a,b)=>orderBy?.inicio==='desc'?b.inicio-a.inicio:a.inicio-b.inicio).slice(0,take??Infinity).map(r=>include?{...r,eventoPai:r.eventoPaiId?rows.find(x=>x.id===r.eventoPaiId):null}:r),
   update:async({where,data}:any)=>{const r=rows.find(x=>x.id===where.id);Object.assign(r,data);if(data.regraRecorrencia&&data.regraRecorrencia._db)r.regraRecorrencia=null;return r},
   deleteMany:async({where}:any)=>{let n=0;for(let i=rows.length-1;i>=0;i--)if(match(rows[i],where)){rows.splice(i,1);n++}return{count:n}},
   delete:async({where}:any)=>{const del=(id:string)=>{rows.filter(r=>r.eventoPaiId===id).forEach(c=>del(c.id));const i=rows.findIndex(r=>r.id===id);if(i>=0)rows.splice(i,1)};del(where.id)},
@@ -56,5 +56,12 @@ const fmt=(d:Date)=>new Date(d.getTime()-180*60000).toISOString().slice(0,16).re
   rows.length=0
   r=await call(c.criar,{body:{nome:'Mutirão',tipo:'REUNIAO',inicio:'2026-11-03T11:00:00.000Z',fusoMinutos:180,recorrencia:'PERSONALIZADA',regraRecorrencia:{unidade:'DIAS',intervalo:15,criterioParada:{tipo:'OCORRENCIAS',valor:3}}}})
   t(rows.map(x=>fmt(x.inicio)).join()==='2026-11-03 08:00,2026-11-18 08:00,2026-12-03 08:00'&&rows[0].regraRecorrencia.unidade==='DIAS','a cada 15 dias')
+  // Abas da lista: intervalo por data (ate exclusivo), ordem e limite
+  r=await call(c.listar,{query:{de:'2026-11-18T03:00:00.000Z',ate:'2026-12-03T11:00:00.000Z'}})
+  t(r.body.length===1&&fmt(new Date(r.body[0].inicio))==='2026-11-18 08:00','intervalo: "ate" é exclusivo')
+  r=await call(c.listar,{query:{ate:'2027-01-01T00:00:00.000Z',ordem:'desc',limite:'2'}})
+  t(r.body.length===2&&fmt(new Date(r.body[0].inicio))==='2026-12-03 08:00','passados: mais recente primeiro e limite')
+  r=await call(c.listar,{query:{de:'data-ruim'}})
+  t(!!r.err,'data inválida é recusada')
   process.exit(ok?0:1)
 })()

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search } from 'lucide-react'
 import api from '@/services/api'
 import type { ItemCampanha, Contribuicao, StatusContribuicao } from '@/types'
 import Button from '@/components/ui/Button'
@@ -12,11 +13,25 @@ import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
 import dayjs from 'dayjs'
 import { formatarMoeda } from '@/utils/data'
+import OrdenacaoSelect from '@/components/ui/OrdenacaoSelect'
+import { compararData, compararTexto, ordenar, type OpcaoOrdenacao } from '@/utils/ordenacao'
+
+type Ordem = 'recentes' | 'antigas' | 'maior' | 'menor' | 'nome'
+const OPCOES_ORDEM: OpcaoOrdenacao<Ordem>[] = [
+  { valor: 'recentes', label: 'Mais recentes primeiro' },
+  { valor: 'antigas', label: 'Mais antigas primeiro' },
+  { valor: 'maior', label: 'Maior valor' },
+  { valor: 'menor', label: 'Menor valor' },
+  { valor: 'nome', label: 'Contribuinte (A–Z)' },
+]
 
 export default function CampanhaAdminPage() {
   const [itens, setItens] = useState<ItemCampanha[]>([])
   const [contribuicoes, setContribuicoes] = useState<Contribuicao[]>([])
   const [aba, setAba] = useState<StatusContribuicao>('PENDENTE')
+  const [busca, setBusca] = useState('')
+  const [filtroItem, setFiltroItem] = useState('')
+  const [ordem, setOrdem] = useState<Ordem>('recentes')
   const [aprovando, setAprovando] = useState<Contribuicao | null>(null)
   const [recusando, setRecusando] = useState<Contribuicao | null>(null)
   const [motivo, setMotivo] = useState('')
@@ -106,7 +121,20 @@ export default function CampanhaAdminPage() {
     { chave: 'RECUSADO', label: 'Recusadas' },
   ]
   const contagem = (st: StatusContribuicao) => contribuicoes.filter((c) => c.status === st).length
-  const listaAba = contribuicoes.filter((c) => c.status === aba)
+  const listaAba = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    const lista = contribuicoes.filter(
+      (c) => c.status === aba && (!filtroItem || c.itemId === filtroItem) &&
+        (!q || c.nomeContribuidor.toLowerCase().includes(q) || (c.item?.nome ?? '').toLowerCase().includes(q))
+    )
+    switch (ordem) {
+      case 'antigas': return ordenar(lista, (a, b) => compararData(a.criadoEm, b.criadoEm))
+      case 'maior': return ordenar(lista, (a, b) => Number(b.valor) - Number(a.valor))
+      case 'menor': return ordenar(lista, (a, b) => Number(a.valor) - Number(b.valor))
+      case 'nome': return ordenar(lista, (a, b) => compararTexto(a.nomeContribuidor, b.nomeContribuidor))
+      default: return ordenar(lista, (a, b) => compararData(b.criadoEm, a.criadoEm))
+    }
+  }, [contribuicoes, aba, busca, filtroItem, ordem])
 
   if (loading) return <Spinner />
 
@@ -143,9 +171,33 @@ export default function CampanhaAdminPage() {
           ))}
         </div>
 
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar contribuinte ou item"
+              aria-label="Buscar contribuições"
+              className="w-full h-9 rounded-lg border border-gray-300 pl-9 pr-3 text-sm outline-none focus:border-primary-500"
+            />
+          </div>
+          <select
+            value={filtroItem}
+            onChange={(e) => setFiltroItem(e.target.value)}
+            aria-label="Filtrar por item"
+            className="h-9 rounded-lg border border-gray-300 bg-white px-2.5 text-sm text-gray-700 outline-none focus:border-primary-500"
+          >
+            <option value="">Todos os itens</option>
+            {itens.map((i) => <option key={i.id} value={i.id}>{i.nome}</option>)}
+          </select>
+          <OrdenacaoSelect value={ordem} onChange={setOrdem} opcoes={OPCOES_ORDEM} />
+        </div>
+
         {listaAba.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">
-            {aba === 'PENDENTE' ? 'Nenhuma contribuição aguardando aprovação.' : 'Nada por aqui ainda.'}
+            {busca || filtroItem ? 'Nenhuma contribuição corresponde aos filtros.' : aba === 'PENDENTE' ? 'Nenhuma contribuição aguardando aprovação.' : 'Nada por aqui ainda.'}
           </p>
         ) : (
           <div className="space-y-2">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CameraOff, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import api from '@/services/api'
 import type { Membro, Cargo, Categoria, ConjuntoMusical } from '@/types'
@@ -11,6 +11,17 @@ import Spinner from '@/components/ui/Spinner'
 import MembroFormModal from '@/components/membros/MembroFormModal'
 import { mascararTelefone } from '@/utils/mascaraTelefone'
 import { formatarDiaMes } from '@/utils/data'
+import OrdenacaoSelect from '@/components/ui/OrdenacaoSelect'
+import { compararData, compararTexto, diasAteAniversario, ordenar, type OpcaoOrdenacao } from '@/utils/ordenacao'
+
+type OrdemMembros = 'nome' | 'nome-desc' | 'aniversario' | 'recentes' | 'antigos'
+const OPCOES_ORDEM_MEMBROS: OpcaoOrdenacao<OrdemMembros>[] = [
+  { valor: 'nome', label: 'Nome (A–Z)' },
+  { valor: 'nome-desc', label: 'Nome (Z–A)' },
+  { valor: 'aniversario', label: 'Próximo aniversário' },
+  { valor: 'recentes', label: 'Cadastrados recentemente' },
+  { valor: 'antigos', label: 'Cadastrados há mais tempo' },
+]
 
 const CORES_AVATAR = [
   'bg-primary-100 text-primary-600',
@@ -69,6 +80,7 @@ export default function MembrosPage() {
   const [cargoIds, setCargoIds] = useState<string[]>([])
   const [categoriaIds, setCategoriaIds] = useState<string[]>([])
   const [conjuntoIds, setConjuntoIds] = useState<string[]>([])
+  const [ordem, setOrdem] = useState<OrdemMembros>('nome')
 
   const [primeiraCarga, setPrimeiraCarga] = useState(true)
   const [carregando, setCarregando] = useState(false)
@@ -153,6 +165,15 @@ export default function MembrosPage() {
   }
 
   const ativos = membros.filter((m) => m.status === 'ATIVO').length
+  const ordenados = useMemo(() => {
+    switch (ordem) {
+      case 'nome-desc': return ordenar(membros, (a, b) => compararTexto(b.nomeCompleto, a.nomeCompleto))
+      case 'aniversario': return ordenar(membros, (a, b) => diasAteAniversario(a.dataNascimento) - diasAteAniversario(b.dataNascimento) || compararTexto(a.nomeCompleto, b.nomeCompleto))
+      case 'recentes': return ordenar(membros, (a, b) => compararData(b.criadoEm, a.criadoEm))
+      case 'antigos': return ordenar(membros, (a, b) => compararData(a.criadoEm, b.criadoEm))
+      default: return ordenar(membros, (a, b) => compararTexto(a.nomeCompleto, b.nomeCompleto))
+    }
+  }, [membros, ordem])
   const Acoes = ({ m }: { m: Membro }) => (
     <div className="flex gap-1 justify-end">
       <button
@@ -215,6 +236,7 @@ export default function MembrosPage() {
           <MultiSelectFilter label="Cargos" options={cargos.map((c) => ({ id: c.id, label: c.nome }))} selected={cargoIds} onChange={setCargoIds} />
           <MultiSelectFilter label="Categorias" options={categorias.map((c) => ({ id: c.id, label: c.nome, grupo: c.grupo }))} selected={categoriaIds} onChange={setCategoriaIds} />
           <MultiSelectFilter label="Conjuntos" options={conjuntos.map((c) => ({ id: c.id, label: c.nome }))} selected={conjuntoIds} onChange={setConjuntoIds} />
+          <OrdenacaoSelect value={ordem} onChange={setOrdem} opcoes={OPCOES_ORDEM_MEMBROS} className="ml-auto" />
         </div>
 
         {chips.length > 0 && (
@@ -266,7 +288,7 @@ export default function MembrosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {membros.map((m) => (
+                {ordenados.map((m) => (
                   <tr key={m.id} className="hover:bg-gray-50/70 align-middle">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -304,7 +326,7 @@ export default function MembrosPage() {
 
           {/* Celular: cartões */}
           <ul className="md:hidden space-y-2.5">
-            {membros.map((m) => (
+            {ordenados.map((m) => (
               <li key={m.id} className="bg-white rounded-xl border border-gray-200 p-3.5">
                 <div className="flex items-start gap-3">
                   <Avatar nome={m.nomeCompleto} />

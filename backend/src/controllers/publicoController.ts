@@ -18,10 +18,19 @@ export async function configuracao(_req: Request, res: Response) {
   )
 }
 
-export async function eventosPublicos(_req: Request, res: Response) {
+const mesPublicoSchema = z.object({
+  mes: z.coerce.number().int().min(1).max(12).optional(),
+  ano: z.coerce.number().int().min(2000).max(2100).optional(),
+})
+
+/** Programação pública. `mes`/`ano` opcionais escolhem o mês do calendário (padrão: mês atual). */
+export async function eventosPublicos(req: Request, res: Response) {
+  const { mes, ano } = mesPublicoSchema.parse(req.query)
   const hoje = new Date()
-  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59)
+  const y = ano ?? hoje.getFullYear()
+  const m = mes ? mes - 1 : hoje.getMonth()
+  const inicioMes = new Date(y, m, 1)
+  const fimMes = new Date(y, m + 1, 0, 23, 59, 59)
 
   const [doMes, proximos] = await Promise.all([
     prisma.evento.findMany({ where: { inicio: { gte: inicioMes, lte: fimMes } }, orderBy: { inicio: 'asc' } }),

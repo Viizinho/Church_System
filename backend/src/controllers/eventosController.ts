@@ -102,20 +102,44 @@ function comSerie<T extends EventoComPai>(e: T) {
 const incluirPai = { eventoPai: { select: { recorrencia: true, regraRecorrencia: true } } }
 
 
+const dataQuery = z
+  .string()
+  .refine((v) => !Number.isNaN(Date.parse(v)), 'Data inválida.')
+  .transform((v) => new Date(v))
+
+/**
+ * Duas formas de consultar:
+ *  - por mês (`mes`, `ano`) — usada pela visão de calendário;
+ *  - por intervalo (`de` e/ou `ate`, ISO) — usada pelas abas Passados / Esta semana / Futuros.
+ *    `ate` é exclusivo. `ordem` (asc|desc) e `limite` controlam a lista.
+ */
+const listarSchema = z.object({
+  mes: z.coerce.number().int().min(1).max(12).optional(),
+  ano: z.coerce.number().int().min(2000).max(2100).optional(),
+  de: dataQuery.optional(),
+  ate: dataQuery.optional(),
+  ordem: z.enum(['asc', 'desc']).optional(),
+  limite: z.coerce.number().int().min(1).max(500).optional(),
+})
+
 export async function listar(req: Request, res: Response) {
-  const { mes, ano } = req.query
+  const q = listarSchema.parse(req.query)
 
-  const now = new Date()
-  const y = ano ? Number(ano) : now.getFullYear()
-  const m = mes ? Number(mes) - 1 : now.getMonth()
-
-  const inicio = new Date(y, m, 1)
-  const fim = new Date(y, m + 1, 0, 23, 59, 59)
+  let filtro: { gte?: Date; lt?: Date; lte?: Date }
+  if (q.de || q.ate) {
+    filtro = { ...(q.de ? { gte: q.de } : {}), ...(q.ate ? { lt: q.ate } : {}) }
+  } else {
+    const now = new Date()
+    const y = q.ano ?? now.getFullYear()
+    const m = q.mes ? q.mes - 1 : now.getMonth()
+    filtro = { gte: new Date(y, m, 1), lte: new Date(y, m + 1, 0, 23, 59, 59) }
+  }
 
   const eventos = await prisma.evento.findMany({
-    where: { inicio: { gte: inicio, lte: fim } },
-    orderBy: { inicio: 'asc' },
+    where: { inicio: filtro },
+    orderBy: { inicio: q.ordem ?? 'asc' },
     include: incluirPai,
+    ...(q.limite ? { take: q.limite } : {}),
   })
 
   return res.json(eventos.map(comSerie))
