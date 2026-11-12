@@ -6,3 +6,4 @@ prisma/migrations/
 .DS_Store
 coverage/
 *.log
+coverage-integracao/

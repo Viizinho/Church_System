@@ -5,10 +5,11 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch:
 
 jobs:
   verificar:
-    name: Tipos, testes, build e auditoria
+    name: Tipos, testes (unidade, API, frontend), build e auditoria
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,14 +22,62 @@ jobs:
       - name: Gerar o cliente do Prisma
         run: npx prisma generate
         working-directory: backend
-      - name: Backend — TypeScript
-        run: npx tsc --noEmit
-        working-directory: backend
-      - name: Frontend — TypeScript + build
+      - name: TypeScript (backend, testes e frontend)
+        run: npm run typecheck
+      - name: Frontend — build
         run: npm run build
         working-directory: frontend
-      - name: Backend — testes (API, recorrência, produção)
-        run: npm test
+      - name: Backend — testes de unidade e de API (com cobertura)
+        run: npm run test:cobertura
         working-directory: backend
+      - name: Frontend — testes de componentes e páginas (com cobertura)
+        run: npm run test:cobertura
+        working-directory: frontend
+      - name: Relatórios de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-unidade-api-frontend
+          path: |
+            backend/coverage
+            frontend/coverage
       - name: Vulnerabilidades em dependências de produção
         run: npm audit --omit=dev --audit-level=high
+
+  integracao:
+    name: Testes de integração (PostgreSQL real)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: igreja_teste
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/igreja_teste
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Criar as tabelas (migrações)
+        run: npx prisma migrate deploy && npx prisma generate
+        working-directory: backend
+      - name: Backend — testes de integração (com cobertura)
+        run: npm run test:integracao -- --coverage
+        working-directory: backend
+      - name: Relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-integracao
+          path: backend/coverage-integracao

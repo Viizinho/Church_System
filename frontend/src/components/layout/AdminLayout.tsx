@@ -29,7 +29,7 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white">
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:px-3 focus:py-2 focus:rounded-lg focus:bg-white focus:shadow">
         Ir para o conteúdo
       </a>
@@ -39,7 +39,7 @@ export default function AdminLayout() {
 
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-56 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transition-transform
-          md:static md:translate-x-0 ${menuAberto ? 'translate-x-0' : '-translate-x-full'}`}
+          md:static md:translate-x-0 print:hidden ${menuAberto ? 'translate-x-0' : '-translate-x-full'}`}
         aria-label="Menu principal"
       >
         <div className="h-14 flex items-center gap-2.5 px-4 border-b border-gray-100">
@@ -82,7 +82,7 @@ export default function AdminLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden h-12 flex items-center gap-2 px-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <header className="md:hidden print:hidden h-12 flex items-center gap-2 px-3 bg-white border-b border-gray-200 flex-shrink-0">
           <button
             type="button"
             onClick={() => setMenuAberto(true)}
@@ -93,7 +93,7 @@ export default function AdminLayout() {
           </button>
           <span className="text-sm font-semibold text-gray-800">Gestão Igreja</span>
         </header>
-        <main id="conteudo" className="flex-1 overflow-y-auto" tabIndex={-1}>
+        <main id="conteudo" className="flex-1 overflow-y-auto print:overflow-visible" tabIndex={-1}>
           <Outlet />
         </main>
       </div>

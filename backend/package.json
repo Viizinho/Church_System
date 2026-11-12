@@ -14,8 +14,11 @@
     "db:studio": "prisma studio",
     "db:deploy": "prisma migrate deploy",
     "db:seed:admin": "ts-node prisma/seed-admin.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx tests/recorrencia.test.ts && tsx tests/aniversario.test.ts && tsx tests/eventos.test.ts && tsx tests/api.test.ts && tsx tests/producao.test.ts"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cobertura": "vitest run --coverage",
+    "test:integracao": "vitest run -c vitest.integracao.config.mts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",
@@ -42,11 +45,15 @@
     "@types/node": "^20.11.0",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.15",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.1.0",
     "prisma": "^5.10.0",
+    "supertest": "^7.3.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.23.15",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^5.1.0"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
