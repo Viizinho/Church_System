@@ -2,6 +2,8 @@
 
 O sistema roda no **notebook** como no desenvolvimento, e o celular acessa o notebook. Há dois jeitos. Antes de cada participante, rode `npm run db:seed:demo` (pasta `backend`), como manda o kit.
 
+> **Antes de tudo:** se existir o arquivo `frontend/.env`, apague dele a linha `VITE_API_URL=...` (ou comente com `#`) e reinicie o `npm run dev` do frontend. Com essa linha, tudo funciona em `localhost`, mas pelo celular ou pelo túnel as seções públicas aparecem **vazias**: a página procura os dados no "localhost" do aparelho de quem acessa.
+
 ## Opção A: túnel do Cloudflare (recomendada para o perfil B)
 
 Gera um endereço `https://...trycloudflare.com` que abre em **qualquer celular com internet**, inclusive no do próprio participante, no 4G. É gratuito e não precisa de conta.
